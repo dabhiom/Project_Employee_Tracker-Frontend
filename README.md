@@ -24,8 +24,8 @@ A centralized system to manage Employees, Projects, Resource Allocation, Finance
 
 ### Frontend
 
-* Khushi Sadhu
 * Avani Patel
+* Khushi Sadhu
 * Dhruhi Shah
 * Sankalp
 * Mansi
