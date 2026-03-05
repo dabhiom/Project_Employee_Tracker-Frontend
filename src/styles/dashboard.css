@@ -1,0 +1,127 @@
+.dashboard-wrap {
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-hero {
+    position: relative;
+    z-index: 1;
+    animation: riseIn 500ms ease-out;
+}
+
+.dashboard-orb {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    filter: blur(8px);
+    opacity: 0.24;
+    pointer-events: none;
+    z-index: 0;
+    animation: floatOrb 7s ease-in-out infinite;
+}
+
+.dashboard-orb-left {
+    top: -40px;
+    left: -30px;
+    background: #38bdf8;
+}
+
+.dashboard-orb-right {
+    right: -55px;
+    top: 35px;
+    background: #fb7185;
+    animation-delay: 1.4s;
+}
+
+.metric-card {
+    border: 1px solid #dbe7ff;
+    border-radius: 14px !important;
+    background: #f9fbff;
+}
+
+.metric-card-animated {
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    transform: translateY(14px);
+    animation: riseIn 600ms ease-out forwards;
+    transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.metric-card-animated:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 28px rgba(30, 58, 138, 0.12);
+}
+
+.metric-label {
+    color: #7183a8;
+}
+
+.metric-value {
+    color: #20427f;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.velocity-item {
+    font-size: 0.9rem;
+    color: #516792;
+}
+
+.velocity-track {
+    height: 10px;
+    background: #e8f0ff;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 0.45rem;
+}
+
+.velocity-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2563eb, #06b6d4);
+    animation: growBar 1.1s ease forwards;
+}
+
+.velocity-fill-one {
+    --bar-width: 78%;
+    animation-delay: 200ms;
+}
+
+.velocity-fill-two {
+    --bar-width: 64%;
+    animation-delay: 400ms;
+}
+
+.velocity-fill-three {
+    --bar-width: 52%;
+    animation-delay: 600ms;
+}
+
+.activity-list {
+    margin: 0.9rem 0 0;
+    padding-left: 1.2rem;
+    color: #526485;
+    display: grid;
+    gap: 0.55rem;
+}
+
+@keyframes floatOrb {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(10px);
+    }
+}
+
+@keyframes growBar {
+    from {
+        width: 0;
+    }
+    to {
+        width: var(--bar-width);
+    }
+}

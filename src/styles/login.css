@@ -1,0 +1,45 @@
+.login-screen {
+    min-height: 100vh;
+    height: 100vh;
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 18px 45px rgba(13, 30, 85, 0.15);
+    border-radius: 22px;
+    padding: 2rem;
+    backdrop-filter: blur(8px);
+}
+
+.login-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    text-align: center;
+    color: #1c356a;
+}
+
+.login-subtitle {
+    margin-top: 0.4rem;
+    text-align: center;
+    color: var(--muted);
+}
+
+.login-button {
+    text-transform: none;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(90deg, #2563eb, #0891b2);
+}
+
+.login-button:hover {
+    background: linear-gradient(90deg, #1d4ed8, #0e7490);
+}
+
+@media (max-width: 600px) {
+    .login-card {
+        padding: 1.3rem;
+        border-radius: 16px;
+    }
+}
