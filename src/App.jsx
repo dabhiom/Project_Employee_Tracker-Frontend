@@ -8,7 +8,7 @@ import LeavePage from './Pages/LeavePage'
 import LoginPage from './Pages/LoginPage'
 import ProjectsPage from './Pages/ProjectsPage'
 import { useMemo, useState } from 'react'
-import CursorBubble from './Components/CursorBubble'
+// import CursorBubble from './Components/CursorBubble'
 
 const AUTH_STORAGE_KEY = 'employeeTrackerAuth'
 
@@ -46,7 +46,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <CursorBubble />
+      {/* <CursorBubble /> */}
       <Routes>
         <Route
           path="/login"
