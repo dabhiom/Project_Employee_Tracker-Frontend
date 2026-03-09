@@ -44,6 +44,7 @@ A centralized system to manage Employees, Projects, Resource Allocation, Finance
 
 ```bash
 npm install
+npm install @mui/material @emotion/react @emotion/styled @mui/icons-material
 npm run dev
 ```
 
