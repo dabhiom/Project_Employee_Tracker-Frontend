@@ -157,15 +157,24 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={() => {}}
       fullWidth
       maxWidth="md"
-      /* Force the paper to never exceed the viewport */
+      disableEscapeKeyDown={true}
+      /* ── BACKDROP FIX ── */
+      slotProps={{
+        backdrop: {
+          sx: {
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(3px)",
+          },
+        },
+      }}
       PaperProps={{
         sx: {
           borderRadius: 3,
           m: 2,
-          height: "calc(100vh - 64px)",   /* fixed height → enables scroll */
+          height: "calc(100vh - 64px)",
           maxHeight: "calc(100vh - 64px)",
           display: "flex",
           flexDirection: "column",
@@ -198,16 +207,14 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
       <DialogContent
         sx={{
           flexGrow: 1,
-          overflowY: "scroll",   /* always show scrollbar track */
+          overflowY: "scroll",
           bgcolor: "#f4f7fb",
           p: 3,
         }}
       >
-
         {/* ─── SECTION 1 : Basic Information ─────────────────────────── */}
         <Section title="Basic Information" />
 
-        {/* Project Name — full width */}
         <Box sx={{ mb: 2 }}>
           <TextField
             fullWidth size="small"
@@ -218,7 +225,6 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
           />
         </Box>
 
-        {/* Client | Project Type | Project Status */}
         <Row>
           <TextField
             fullWidth select size="small"
@@ -251,7 +257,6 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
           </TextField>
         </Row>
 
-        {/* Start Date | End Date */}
         <Row>
           <TextField
             fullWidth size="small" type="date"
@@ -302,7 +307,6 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
         {/* ─── SECTION 3 : Additional Details ────────────────────────── */}
         <Section title="Additional Details" />
 
-        {/* Description | Comment */}
         <Row>
           <TextField
             fullWidth size="small" multiline rows={4}
@@ -318,7 +322,6 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
           />
         </Row>
 
-        {/* Toggle cards */}
         <Row>
           <ToggleCard
             label="Client Asset Required"
@@ -336,7 +339,6 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
             successColor
           />
         </Row>
-
       </DialogContent>
 
       {/* ══ FIXED FOOTER ═══════════════════════════════════════════════════ */}
@@ -379,7 +381,6 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
           {editData ? "Update Project" : "Save Project"}
         </Button>
       </DialogActions>
-
     </Dialog>
   );
 }
