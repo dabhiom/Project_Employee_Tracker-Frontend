@@ -13,10 +13,7 @@ import EndClientMasterPage from './MasterPage/EndClientMasterPage'
 import ManagerMasterPage from './MasterPage/ManagerMasterPage'
 import CustomerMasterPage from './MasterPage/CustomerMasterPage'
 import { useMemo, useState } from 'react'
-<<<<<<< feature/khushi
-=======
-// import CursorBubble from './Components/CursorBubble'
->>>>>>> main
+
 
 const AUTH_STORAGE_KEY = 'employeeTrackerAuth'
 
@@ -54,10 +51,6 @@ function App() {
 
   return (
     <BrowserRouter>
-<<<<<<< feature/khushi
-=======
-      {/* <CursorBubble /> */}
->>>>>>> main
       <Routes>
         <Route
           path="/login"
