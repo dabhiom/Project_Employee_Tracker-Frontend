@@ -7,8 +7,13 @@ import FinancePage from './Pages/FinancePage'
 import LeavePage from './Pages/LeavePage'
 import LoginPage from './Pages/LoginPage'
 import ProjectsPage from './Pages/ProjectsPage'
+import ResourcePage from './Pages/ResourcePage'
+import DesignationMasterPage from './MasterPage/DesignationMasterPage'
+import EndClientMasterPage from './MasterPage/EndClientMasterPage'
+import ManagerMasterPage from './MasterPage/ManagerMasterPage'
+import CustomerMasterPage from './MasterPage/CustomerMasterPage'
 import { useMemo, useState } from 'react'
-// import CursorBubble from './Components/CursorBubble'
+
 
 const AUTH_STORAGE_KEY = 'employeeTrackerAuth'
 
@@ -46,7 +51,6 @@ function App() {
 
   return (
     <BrowserRouter>
-      {/* <CursorBubble /> */}
       <Routes>
         <Route
           path="/login"
@@ -71,8 +75,13 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/resource" element={<ResourcePage />} />
             <Route path="/leave" element={<LeavePage />} />
             <Route path="/finance" element={<FinancePage />} />
+            <Route path="/master/designation" element={<DesignationMasterPage />} />
+            <Route path="/master/end-client" element={<EndClientMasterPage />} />
+            <Route path="/master/manager" element={<ManagerMasterPage />} />
+            <Route path="/master/customer" element={<CustomerMasterPage />} />
           </Route>
         </Route>
 

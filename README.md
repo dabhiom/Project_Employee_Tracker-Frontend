@@ -46,6 +46,9 @@ A centralized system to manage Employees, Projects, Resource Allocation, Finance
 npm install
 npm install @mui/material @emotion/react @emotion/styled @mui/icons-material
 npm run dev
+<<<<<<< feature/khushi
+```
+=======
 ```
 
 Added Features:
@@ -73,3 +76,4 @@ src/Components/AppLayout.jsx
 src/Pages/LoginPage.jsx
 src/Pages/DashboardPage.jsx
 src/Components/CursorBubble.jsx
+>>>>>>> main
