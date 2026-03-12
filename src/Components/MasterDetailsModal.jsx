@@ -15,28 +15,26 @@ import {
 import { Close, Edit } from "@mui/icons-material";
 import { forwardRef } from "react";
 
-/* ── Slide-up transition ─────────────────────────────────────────────────── */
 const SlideUp = forwardRef(function SlideUp(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
-/* ── Section heading ────────────────────────────────────────────────────── */
 export const Section = ({ title }) => (
   <Box sx={{ mb: 2 }}>
     <Typography
       variant="caption"
       fontWeight={700}
       color="#1a3c6e"
-      letterSpacing={1.2}
+      letterSpacing={1.4}
       textTransform="uppercase"
+      sx={{ fontSize: "0.68rem" }}
     >
       {title}
     </Typography>
-    <Divider sx={{ mt: 0.5, borderColor: "#d0dff0" }} />
+    <Divider sx={{ mt: 0.75, borderColor: "#dce8f5" }} />
   </Box>
 );
 
-/* ── Single detail row ──────────────────────────────────────────────────── */
 export const DetailItem = ({ icon: Icon, label, value }) => (
   <Box
     sx={{
@@ -44,35 +42,46 @@ export const DetailItem = ({ icon: Icon, label, value }) => (
       alignItems: "flex-start",
       gap: 1.5,
       bgcolor: "#fff",
-      border: "1px solid #e8eef7",
-      borderRadius: 2,
+      border: "1px solid #eaf0f8",
+      borderRadius: 1.5,           // ← reduced radius on detail items
       px: 2,
       py: 1.5,
-      transition: "border-color 0.2s",
-      "&:hover": { borderColor: "#b3cce8" },
+      transition: "all 0.18s",
+      "&:hover": {
+        borderColor: "#1a3c6e",
+        boxShadow: "0 2px 8px rgba(26,60,110,0.07)",
+      },
     }}
   >
     {Icon && (
-      <Icon sx={{ fontSize: 18, color: "#1a3c6e", mt: 0.2, flexShrink: 0 }} />
+      <Icon sx={{ fontSize: 16, color: "#4a7ab5", mt: 0.3, flexShrink: 0 }} />
     )}
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       <Typography
-        variant="caption"
-        color="text.secondary"
-        fontWeight={600}
-        textTransform="uppercase"
-        letterSpacing={0.8}
+        sx={{
+          fontSize: "0.65rem",
+          fontWeight: 700,
+          color: "#8faabf",
+          textTransform: "uppercase",
+          letterSpacing: 1,
+          lineHeight: 1,
+          mb: 0.4,
+        }}
       >
         {label}
       </Typography>
-      <Typography variant="body2" fontWeight={500} color="#1a1a2e" mt={0.2}>
+      <Typography
+        variant="body2"
+        fontWeight={600}
+        color="#1a2740"
+        sx={{ wordBreak: "break-word" }}
+      >
         {value || "—"}
       </Typography>
     </Box>
   </Box>
 );
 
-/* ── Two-column container ───────────────────────────────────────────────── */
 export const TwoCol = ({ children }) => (
   <Box
     sx={{
@@ -86,7 +95,10 @@ export const TwoCol = ({ children }) => (
   </Box>
 );
 
-/* ════════════════════════════════════════════════════════════════════════ */
+// Attach static sub-components so EmployeesPage can use MasterDetailsModal.DetailItem
+MasterDetailsModal.DetailItem = DetailItem;
+MasterDetailsModal.Section = Section;
+
 export default function MasterDetailsModal({
   open,
   onClose,
@@ -109,19 +121,20 @@ export default function MasterDetailsModal({
       TransitionComponent={SlideUp}
       PaperProps={{
         sx: {
-          borderRadius: isXs ? 0 : 3,
+          borderRadius: isXs ? 0 : 2,    // ← reduced from 3 → 2
           m: isXs ? 0 : 2,
-          maxHeight: isXs ? "100%" : "calc(100vh - 64px)",
+          maxHeight: isXs ? "100%" : "calc(100vh - 48px)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          boxShadow: "0 24px 64px rgba(26,60,110,0.18)",
         },
       }}
     >
-      {/* ── Fixed Header ─────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────── */}
       <DialogTitle
         sx={{
-          bgcolor: "#1a3c6e",
+          background: "linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)",
           color: "#fff",
           px: 3,
           py: 2,
@@ -131,54 +144,65 @@ export default function MasterDetailsModal({
           alignItems: "center",
         }}
       >
-        <Typography fontWeight={700} fontSize="1.05rem">
-          {title}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 4,
+              height: 22,
+              bgcolor: "#5baeff",
+              borderRadius: 2,
+            }}
+          />
+          <Typography fontWeight={700} fontSize="1rem" letterSpacing={0.3}>
+            {title}
+          </Typography>
+        </Box>
         <IconButton
           onClick={onClose}
           size="small"
           sx={{
-            color: "#fff",
-            "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
+            color: "rgba(255,255,255,0.75)",
+            "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.12)" },
           }}
         >
           <Close fontSize="small" />
         </IconButton>
       </DialogTitle>
 
-      {/* ── Scrollable Content ───────────────────────────────────────── */}
+      {/* ── Content ─────────────────────────────────────────────────── */}
       <DialogContent
         sx={{
           flexGrow: 1,
           overflowY: "auto",
           bgcolor: "#f4f7fb",
-          p: 3,
+          p: { xs: 2, sm: 3 }
         }}
       >
         {children}
       </DialogContent>
 
-      {/* ── Fixed Footer ─────────────────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────────────────────── */}
       <DialogActions
         sx={{
           px: 3,
           py: 2,
           bgcolor: "#fff",
-          borderTop: "1px solid #e0e7ef",
+          borderTop: "1px solid #e8eef7",
           flexShrink: 0,
-          gap: 1.5,
+          gap: 1,
         }}
       >
         <Button
           variant="outlined"
           onClick={onClose}
           sx={{
-            borderRadius: 2,
+            borderRadius: 1.5,
             textTransform: "none",
-            borderColor: "#1a3c6e",
-            color: "#1a3c6e",
+            fontWeight: 600,
+            borderColor: "#c8d8ec",
+            color: "#4a6d9c",
             px: 3,
-            "&:hover": { bgcolor: "#e8eef7", borderColor: "#1a3c6e" },
+            "&:hover": { bgcolor: "#f0f5fb", borderColor: "#1a3c6e", color: "#1a3c6e" },
           }}
         >
           Close
@@ -186,15 +210,16 @@ export default function MasterDetailsModal({
         {onEdit && (
           <Button
             variant="contained"
-            startIcon={<Edit />}
+            startIcon={<Edit sx={{ fontSize: "16px !important" }} />}
             onClick={onEdit}
             sx={{
-              borderRadius: 2,
+              borderRadius: 1.5,
               textTransform: "none",
               fontWeight: 700,
               bgcolor: "#1a3c6e",
               px: 3,
-              "&:hover": { bgcolor: "#15305a" },
+              boxShadow: "0 4px 12px rgba(26,60,110,0.25)",
+              "&:hover": { bgcolor: "#15305a", boxShadow: "0 6px 16px rgba(26,60,110,0.3)" },
             }}
           >
             {editLabel}
