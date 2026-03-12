@@ -92,14 +92,24 @@ export default function ProjectDetailsModal({ open, onClose, data, onEdit }) {
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={() => {}}
       fullWidth
       maxWidth="sm"
+      disableEscapeKeyDown={true}
+      /* ── BACKDROP FIX ── */
+      slotProps={{
+        backdrop: {
+          sx: {
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(3px)",
+          },
+        },
+      }}
       PaperProps={{
         sx: {
           borderRadius: 3,
           m: 2,
-          height: "calc(100vh - 64px)",      /* fixed height → enables scroll */
+          height: "calc(100vh - 64px)",
           maxHeight: "calc(100vh - 64px)",
           display: "flex",
           flexDirection: "column",
@@ -149,12 +159,11 @@ export default function ProjectDetailsModal({ open, onClose, data, onEdit }) {
       <DialogContent
         sx={{
           flexGrow: 1,
-          overflowY: "scroll",          /* always scrollable */
+          overflowY: "scroll",
           bgcolor: "#f4f7fb",
           p: 3,
         }}
       >
-
         {/* ─── SECTION 1 : Project Details ───────────────────────────── */}
         <Section title="Project Details" />
 
@@ -169,27 +178,15 @@ export default function ProjectDetailsModal({ open, onClose, data, onEdit }) {
 
         <TwoCol>
           <Box sx={{ flex: 1 }}>
-            <DetailItem
-              icon={CalendarToday}
-              label="Start Date"
-              value={data.projectStartDate}
-            />
+            <DetailItem icon={CalendarToday} label="Start Date" value={data.projectStartDate} />
           </Box>
           <Box sx={{ flex: 1 }}>
-            <DetailItem
-              icon={CalendarToday}
-              label="End Date"
-              value={data.projectEndDate || "Not set"}
-            />
+            <DetailItem icon={CalendarToday} label="End Date" value={data.projectEndDate || "Not set"} />
           </Box>
         </TwoCol>
 
         <Box sx={{ mb: 2 }}>
-          <DetailItem
-            icon={CalendarToday}
-            label="Created On"
-            value={data.createdAt}
-          />
+          <DetailItem icon={CalendarToday} label="Created On" value={data.createdAt} />
         </Box>
 
         <Divider sx={{ my: 3, borderColor: "#dce6f5" }} />
@@ -322,7 +319,6 @@ export default function ProjectDetailsModal({ open, onClose, data, onEdit }) {
             </Box>
           </Box>
         </TwoCol>
-
       </DialogContent>
 
       {/* ══ FIXED FOOTER ═══════════════════════════════════════════════════ */}
@@ -366,7 +362,6 @@ export default function ProjectDetailsModal({ open, onClose, data, onEdit }) {
           Edit Project
         </Button>
       </DialogActions>
-
     </Dialog>
   );
 }

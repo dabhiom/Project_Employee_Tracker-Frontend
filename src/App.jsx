@@ -12,8 +12,13 @@ import DesignationMaster from './masters/DesignationMaster'
 import EndClientMaster from './masters/EndClientMaster'
 import CustomerMaster from './masters/CustomerMaster'
 import ManagerMaster from './masters/ManagerMaster'
+import ResourcePage from './Pages/ResourcePage'
+import DesignationMasterPage from './MasterPage/DesignationMasterPage'
+import EndClientMasterPage from './MasterPage/EndClientMasterPage'
+import ManagerMasterPage from './MasterPage/ManagerMasterPage'
+import CustomerMasterPage from './MasterPage/CustomerMasterPage'
 import { useMemo, useState } from 'react'
-// import CursorBubble from './Components/CursorBubble'
+
 
 const AUTH_STORAGE_KEY = 'employeeTrackerAuth'
 
@@ -54,6 +59,20 @@ function App() {
       <BrowserRouter>
         {/* <CursorBubble /> */}
         <Routes>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            authState.isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <LoginPage onLoginSuccess={handleLoginSuccess} />
+            )
+          }
+        />
+
+        <Route element={<ProtectedRoute isAuthenticated={authState.isAuthenticated} />}>
           <Route
             path="/login"
             element={
@@ -84,6 +103,17 @@ function App() {
               <Route path="/customer-master" element={<CustomerMaster />} />
               <Route path="/manager-master" element={<ManagerMaster />} />
             </Route>
+          >
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/employees" element={<EmployeesPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/resource" element={<ResourcePage />} />
+            <Route path="/leave" element={<LeavePage />} />
+            <Route path="/finance" element={<FinancePage />} />
+            <Route path="/master/designation" element={<DesignationMasterPage />} />
+            <Route path="/master/end-client" element={<EndClientMasterPage />} />
+            <Route path="/master/manager" element={<ManagerMasterPage />} />
+            <Route path="/master/customer" element={<CustomerMasterPage />} />
           </Route>
 
           <Route
