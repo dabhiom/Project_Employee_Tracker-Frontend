@@ -1,12 +1,17 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './Components/AppLayout'
 import ProtectedRoute from './Components/ProtectedRoute'
+import { ToastProvider } from './Components/ToastProvider'
 import DashboardPage from './Pages/DashboardPage'
 import EmployeesPage from './Pages/EmployeesPage'
 import FinancePage from './Pages/FinancePage'
 import LeavePage from './Pages/LeavePage'
 import LoginPage from './Pages/LoginPage'
 import ProjectsPage from './Pages/ProjectsPage'
+import DesignationMaster from './masters/DesignationMaster'
+import EndClientMaster from './masters/EndClientMaster'
+import CustomerMaster from './masters/CustomerMaster'
+import ManagerMaster from './masters/ManagerMaster'
 import { useMemo, useState } from 'react'
 // import CursorBubble from './Components/CursorBubble'
 
@@ -45,43 +50,49 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      {/* <CursorBubble /> */}
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            authState.isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <LoginPage onLoginSuccess={handleLoginSuccess} />
-            )
-          }
-        />
-
-        <Route element={<ProtectedRoute isAuthenticated={authState.isAuthenticated} />}>
+    <ToastProvider>
+      <BrowserRouter>
+        {/* <CursorBubble /> */}
+        <Routes>
           <Route
+            path="/login"
             element={
-              <AppLayout
-                userEmail={authState?.user?.email}
-                onLogout={handleLogout}
-              />
+              authState.isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+              )
             }
-          >
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/employees" element={<EmployeesPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/leave" element={<LeavePage />} />
-            <Route path="/finance" element={<FinancePage />} />
-          </Route>
-        </Route>
+          />
 
-        <Route
-          path="*"
-          element={<Navigate to={authState.isAuthenticated ? '/dashboard' : '/login'} replace />}
-        />
-      </Routes>
-    </BrowserRouter>
+          <Route element={<ProtectedRoute isAuthenticated={authState.isAuthenticated} />}>
+            <Route
+              element={
+                <AppLayout
+                  userEmail={authState?.user?.email}
+                  onLogout={handleLogout}
+                />
+              }
+            >
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/employees" element={<EmployeesPage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/leave" element={<LeavePage />} />
+              <Route path="/finance" element={<FinancePage />} />
+              <Route path="/designation-master" element={<DesignationMaster />} />
+              <Route path="/end-client-master" element={<EndClientMaster />} />
+              <Route path="/customer-master" element={<CustomerMaster />} />
+              <Route path="/manager-master" element={<ManagerMaster />} />
+            </Route>
+          </Route>
+
+          <Route
+            path="*"
+            element={<Navigate to={authState.isAuthenticated ? '/dashboard' : '/login'} replace />}
+          />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   )
 }
 
