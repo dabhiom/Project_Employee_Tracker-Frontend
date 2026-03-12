@@ -308,7 +308,7 @@ export default function EndClientMaster() {
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
         />
-        <FullWidthField>
+        {/* <FullWidthField> */}
           <TextField
             label="Address"
             fullWidth
@@ -318,7 +318,7 @@ export default function EndClientMaster() {
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
           />
-        </FullWidthField>
+        {/* </FullWidthField> */}
       </MasterFormDialog>
 
       {/* ── Delete Dialog ─────────────────────────────────────────────────── */}
