@@ -26,6 +26,10 @@ import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded'
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded'
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded'
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded'
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
+import BusinessIcon from '@mui/icons-material/Business'
+import PersonIcon from '@mui/icons-material/Person'
+import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded'
 import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded'
@@ -45,6 +49,10 @@ const navItems = [
   { to: '/resource', label: 'Resource', icon: <MenuBookRoundedIcon fontSize="small" /> },
   { to: '/leave', label: 'Leave', icon: <EventAvailableRoundedIcon fontSize="small" /> },
   { to: '/finance', label: 'Finance', icon: <AccountBalanceWalletRoundedIcon fontSize="small" /> },
+  { to: '/designation-master', label: 'Designation Master', icon: <SettingsRoundedIcon fontSize="small" /> },
+  { to: '/end-client-master', label: 'End Client Master', icon: <BusinessIcon fontSize="small" /> },
+  { to: '/customer-master', label: 'Customer Master', icon: <PersonIcon fontSize="small" /> },
+  { to: '/manager-master', label: 'Manager Master', icon: <SupervisorAccountIcon fontSize="small" /> },
 ]
 
 const masterItems = [
