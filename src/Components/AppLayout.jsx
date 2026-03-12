@@ -49,10 +49,6 @@ const navItems = [
   { to: '/resource', label: 'Resource', icon: <MenuBookRoundedIcon fontSize="small" /> },
   { to: '/leave', label: 'Leave', icon: <EventAvailableRoundedIcon fontSize="small" /> },
   { to: '/finance', label: 'Finance', icon: <AccountBalanceWalletRoundedIcon fontSize="small" /> },
-  { to: '/designation-master', label: 'Designation Master', icon: <SettingsRoundedIcon fontSize="small" /> },
-  { to: '/end-client-master', label: 'End Client Master', icon: <BusinessIcon fontSize="small" /> },
-  { to: '/customer-master', label: 'Customer Master', icon: <PersonIcon fontSize="small" /> },
-  { to: '/manager-master', label: 'Manager Master', icon: <SupervisorAccountIcon fontSize="small" /> },
 ]
 
 const masterItems = [
