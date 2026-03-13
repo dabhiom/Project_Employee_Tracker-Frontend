@@ -26,6 +26,7 @@ function LoginPage({ onLoginSuccess }) {
   const [error,        setError]        = useState('')
   const [loading,      setLoading]      = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
 
   const handleChange = (event) => {
@@ -236,6 +237,7 @@ function LoginPage({ onLoginSuccess }) {
                   variant="contained"
                   fullWidth
                   size="large"
+                  disabled={isSubmitting}
                   sx={{
                     mt: 1,
                     py: 1.5,
@@ -251,7 +253,7 @@ function LoginPage({ onLoginSuccess }) {
                     },
                   }}
                 >
-                  Sign In
+                  {isSubmitting ? 'Signing In...' : 'Sign In'}
                 </Button>
 
                 <Typography variant="body2" color="text.secondary">
