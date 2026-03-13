@@ -46,34 +46,3 @@ A centralized system to manage Employees, Projects, Resource Allocation, Finance
 npm install
 npm install @mui/material @emotion/react @emotion/styled @mui/icons-material
 npm run dev
-<<<<<<< feature/khushi
-```
-=======
-```
-
-Added Features:
-
-Login page with email/password
-Show/Hide password toggle
-Protected dashboard routing
-Sidebar + topbar layout
-Cursor bubble effect
-Dashboard animations
-
-Dependencies Added:
-bootstrap 
-
-CSS Structure:
-src/styles/layout.css
-src/styles/login.css
-src/styles/dashboard.css
-src/styles/cursor.css
-
-Main Files Updated:
-src/App.jsx
-src/main.jsx
-src/Components/AppLayout.jsx
-src/Pages/LoginPage.jsx
-src/Pages/DashboardPage.jsx
-src/Components/CursorBubble.jsx
->>>>>>> main
