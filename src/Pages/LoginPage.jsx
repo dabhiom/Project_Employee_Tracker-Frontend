@@ -4,12 +4,15 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
+  Container,
   IconButton,
   InputAdornment,
+  Paper,
   Stack,
   TextField,
   Typography,
+  Fade,
+  Grow,
 } from '@mui/material'
 import MailOutlineRoundedIcon    from '@mui/icons-material/MailOutlineRounded'
 import LockOutlineRoundedIcon    from '@mui/icons-material/LockOutlineRounded'
@@ -73,87 +76,193 @@ function LoginPage({ onLoginSuccess }) {
   }
 
   return (
-    <div className="login-screen">
-      <div className="container h-100 d-flex align-items-center justify-content-center">
-        <div className="row w-100 justify-content-center">
-          <div className="col-12 col-sm-10 col-md-8 col-lg-5">
-            <Box className="login-card">
-              <Typography variant="h4" className="login-title">
+    <Box
+      sx={{
+        minHeight: '100vh',
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 3,
+        background:
+          'radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.95) 24%, rgba(255, 255, 255, 0) 56%), radial-gradient(circle at 16% 14%, rgba(96, 165, 250, 0.18), transparent 42%), radial-gradient(circle at 84% 14%, rgba(244, 114, 182, 0.16), transparent 40%), radial-gradient(circle at 78% 84%, rgba(147, 197, 253, 0.14), transparent 34%), linear-gradient(145deg, #f3f8ff 0%, #fff3f9 52%, #f2f8ff 100%)',
+      }}
+    >
+      <Box
+        aria-hidden="true"
+        sx={{
+          position: 'absolute',
+          top: -60,
+          left: -35,
+          width: 210,
+          height: 210,
+          borderRadius: '50%',
+          bgcolor: 'rgba(96, 165, 250, 0.16)',
+          filter: 'blur(16px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <Box
+        aria-hidden="true"
+        sx={{
+          position: 'absolute',
+          right: -46,
+          bottom: -56,
+          width: 220,
+          height: 220,
+          borderRadius: '50%',
+          bgcolor: 'rgba(244, 114, 182, 0.14)',
+          filter: 'blur(16px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <Grow in={true} timeout={800}>
+        <Container maxWidth="xs" sx={{ px: { xs: 1, sm: 2 } }}>
+          <Paper
+            elevation={24}
+            sx={{
+              p: { xs: 3, sm: 5 },
+              borderRadius: 5,
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(14px)',
+              boxShadow: '0 16px 44px rgba(37, 99, 235, 0.14)',
+              border: '1px solid rgba(255, 255, 255, 0.68)',
+              textAlign: 'center',
+              width: '100%',
+              overflow: 'hidden',
+            }}
+          >
+            <Box mb={4}>
+              <Typography
+                variant="h4"
+                fontWeight="500"
+                sx={{
+                  fontSize: { xs: '2.15rem', sm: '3rem' },
+                  fontWeight: 700,
+                  background: 'linear-gradient(92deg, #2563eb 0%, #0ea5e9 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  mb: 0.8,
+                  wordBreak: 'break-word',
+                  lineHeight: 1.2,
+                }}
+              >
+                Tecnoprism
+              </Typography>
+              <Typography variant="body1" color="text.secondary" fontWeight="500">
                 Employee Tracker
               </Typography>
-              <Typography variant="body2" className="login-subtitle">
-                Sign in to continue to your workspace.
-              </Typography>
-
-              <form onSubmit={handleSubmit} className="mt-4">
-                <Stack spacing={2.5}>
-                  {error ? <Alert severity="error">{error}</Alert> : null}
-
-                  <TextField
-                    fullWidth
-                    name="email"
-                    label="Email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    disabled={loading}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <MailOutlineRoundedIcon fontSize="small" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-
-                  <TextField
-                    fullWidth
-                    name="password"
-                    label="Password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={handleChange}
-                    disabled={loading}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LockOutlineRoundedIcon fontSize="small" />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            edge="end"
-                            onClick={() => setShowPassword((prev) => !prev)}
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
-                            disabled={loading}
-                          >
-                            {showPassword
-                              ? <VisibilityOffRoundedIcon fontSize="small" />
-                              : <VisibilityRoundedIcon   fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="large"
-                    className="login-button"
-                    disabled={loading}
-                    startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
-                  >
-                    {loading ? 'Signing in…' : 'Login'}
-                  </Button>
-                </Stack>
-              </form>
             </Box>
-          </div>
-        </div>
-      </div>
-    </div>
+
+            <form onSubmit={handleSubmit}>
+              <Stack spacing={3}>
+                {error && (
+                  <Fade in={!!error}>
+                    <Alert
+                      severity="error"
+                      variant="filled"
+                      sx={{ borderRadius: 2 }}
+                    >
+                      {error}
+                    </Alert>
+                  </Fade>
+                )}
+
+                <TextField
+                  fullWidth
+                  name="email"
+                  label="Email Address"
+                  type="email"
+                  variant="outlined"
+                  size="small"
+                  value={formData.email}
+                  onChange={handleChange}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <MailOutlineRoundedIcon color="action" fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2.5,
+                      bgcolor: 'rgba(255,255,255,0.78)',
+                    },
+                  }}
+                  sx={{ '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.45)' } }}
+                />
+
+                <TextField
+                  fullWidth
+                  name="password"
+                  label="Password"
+                  type={showPassword ? 'text' : 'password'}
+                  variant="outlined"
+                  size="small"
+                  value={formData.password}
+                  onChange={handleChange}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LockOutlineRoundedIcon color="action" fontSize="small" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          edge="end"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          size="small"
+                        >
+                          {showPassword ? (
+                            <VisibilityOffRoundedIcon fontSize="small" />
+                          ) : (
+                            <VisibilityRoundedIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2.5,
+                      bgcolor: 'rgba(255,255,255,0.78)',
+                    },
+                  }}
+                  sx={{ '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.45)' } }}
+                />
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  sx={{
+                    mt: 1,
+                    py: 1.5,
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    background: 'linear-gradient(92deg, #2563eb 0%, #0ea5e9 100%)',
+                    boxShadow: '0 8px 22px rgba(37, 99, 235, 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(92deg, #1d4ed8 0%, #0284c7 100%)',
+                      boxShadow: '0 10px 24px rgba(37, 99, 235, 0.34)',
+                    },
+                  }}
+                >
+                  Sign In
+                </Button>
+
+                <Typography variant="body2" color="text.secondary">
+                  Manage your team with precision
+                </Typography>
+              </Stack>
+            </form>
+          </Paper>
+        </Container>
+      </Grow>
+    </Box>
   )
 }
 
