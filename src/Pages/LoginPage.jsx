@@ -1,3 +1,4 @@
+// src/Pages/LoginPage.jsx
 import { useState } from 'react'
 import {
   Alert,
@@ -13,19 +14,17 @@ import {
   Fade,
   Grow,
 } from '@mui/material'
-import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded'
-import LockOutlineRoundedIcon from '@mui/icons-material/LockOutlineRounded'
-import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded'
-import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
-import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-const AUTH_TOKEN_STORAGE_KEY = 'employeeTrackerToken'
+import MailOutlineRoundedIcon    from '@mui/icons-material/MailOutlineRounded'
+import LockOutlineRoundedIcon    from '@mui/icons-material/LockOutlineRounded'
+import VisibilityOffRoundedIcon  from '@mui/icons-material/VisibilityOffRounded'
+import VisibilityRoundedIcon     from '@mui/icons-material/VisibilityRounded'
+import { useNavigate }           from 'react-router-dom'
+import { loginUser, saveToken }  from '../api/projectApi'   // ← added
 
 function LoginPage({ onLoginSuccess }) {
-  const [formData, setFormData] = useState({ email: '', password: '' })
-  const [error, setError] = useState('')
+  const [formData,     setFormData]     = useState({ email: '', password: '' })
+  const [error,        setError]        = useState('')
+  const [loading,      setLoading]      = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
@@ -33,60 +32,47 @@ function LoginPage({ onLoginSuccess }) {
   const handleChange = (event) => {
     const { name, value } = event.target
     setFormData((prev) => ({ ...prev, [name]: value }))
-    if (error) {
-      setError('')
-    }
+    if (error) setError('')
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
 
+    // ── Basic validation ────────────────────────────────────────────────────
     if (!formData.email.trim() || !formData.password.trim()) {
       setError('Please enter both email and password.')
       return
     }
-
     if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
       setError('Please enter a valid email address.')
       return
     }
 
+    // ── Call real login API ─────────────────────────────────────────────────
+    setLoading(true)
     setError('')
-    setIsSubmitting(true)
-
     try {
-      const payload = {
-        email: formData.email.trim(),
-        password: formData.password,
-      }
-
-      const { data } = await axios.post(`${API_BASE_URL}/api/auth/login`, payload)
-      const loginToken = data?.token ?? data?.accessToken ?? data?.data?.token
-
-      if (loginToken) {
-        localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, loginToken)
-      }
-
-      onLoginSuccess?.({
-        email: data?.email ?? payload.email,
-        token: loginToken,
-        ...data,
+      const res = await loginUser({
+        email:    formData.email.trim(),
+        password: formData.password.trim(),
       })
+
+      // Backend may return token at res.data.token OR res.data.data.token
+      const token = res.data?.token ?? res.data?.data?.token
+      if (!token) throw new Error('No token received from server.')
+
+      saveToken(token)                          // ← saves to localStorage
+      onLoginSuccess?.({ email: formData.email.trim() })
       navigate('/dashboard')
-    } catch (requestError) {
-      if (!requestError?.response) {
-        setError(`Cannot reach API server at ${API_BASE_URL || 'current host'}. Ensure backend is running on port 5000.`)
-        return
-      }
-
-      const serverMessage =
-        requestError?.response?.data?.message ||
-        requestError?.response?.data?.error ||
-        requestError?.message
-
-      setError(serverMessage || 'Login failed. Please try again.')
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error   ||
+        err.message                  ||
+        'Login failed. Please check your credentials.'
+      setError(msg)
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
