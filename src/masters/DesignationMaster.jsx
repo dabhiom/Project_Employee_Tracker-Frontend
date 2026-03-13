@@ -183,7 +183,7 @@ export default function DesignationMaster() {
       {!isMobile && (
         <Paper
           elevation={0}
-          sx={{ border: "1px solid #e0e9f5", borderRadius: 3, overflow: "hidden" }}
+          sx={{ border: "1px solid #e0e9f5", borderRadius: 1, overflow: "hidden" }}
         >
           <TableContainer>
             <Table stickyHeader>
