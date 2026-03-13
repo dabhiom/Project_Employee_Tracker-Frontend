@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Autocomplete,
   Box,
@@ -11,12 +11,13 @@ import {
   IconButton,
   InputAdornment,
   MenuItem,
+  CircularProgress,
   Switch,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { Close, Save, Edit, InfoOutlined, CheckCircleOutline } from "@mui/icons-material";
+import { Close, Save, Edit, InfoOutlined, CheckCircleOutline, LocationOn } from "@mui/icons-material";
 
 /* ── Default empty form ─────────────────────────────────────────────────── */
 const EMPTY = {
@@ -52,7 +53,124 @@ const STATUS_OPTIONS    = ["Active", "Notice", "Exited"];
 const WORK_MODE_OPTIONS = ["WFH", "WFO", "Hybrid"];
 const DESIGNATION_OPTIONS = ["Developer", "Manager", "Analyst", "Designer", "Team Lead", "Senior Developer"];
 const MANAGER_OPTIONS   = ["Rahul Sharma", "Ankit Joshi", "Deepak Nair", "Priya Mehta", "Sneha Patel"];
-const LOCATION_OPTIONS  = ["Mumbai", "Delhi", "Bangalore", "Chennai", "Hyderabad", "Pune", "Kolkata"];
+
+/* ── Live Location Autocomplete using OpenStreetMap Nominatim ──────────────
+   No API key needed — same data used by Wikipedia, many real apps.
+   Debounces 400ms, shows city/district suggestions worldwide.
+─────────────────────────────────────────────────────────────────────────── */
+function LocationAutocomplete({ label, value, onChange, sx }) {
+  const [inputValue, setInputValue]   = useState(value || "");
+  const [options, setOptions]         = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [open, setOpen]               = useState(false);
+  const debounceRef                   = useRef(null);
+
+  // Sync external value changes (e.g. edit mode pre-fill)
+  useEffect(() => { setInputValue(value || ""); }, [value]);
+
+  const fetchSuggestions = useCallback(async (query) => {
+    if (!query || query.length < 2) { setOptions([]); return; }
+    setLoading(true);
+    try {
+      // countrycodes=in — restricts to India only
+      // addressdetails=1 — gives state/district info
+      // Remove featureType so smaller cities/towns/talukas are included
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=10&countrycodes=in`;
+      const res = await fetch(url, {
+        headers: { "Accept-Language": "en", "User-Agent": "EmployeeTracker/1.0" }
+      });
+      const data = await res.json();
+      const seen = new Set();
+      const places = data
+        .map((item) => {
+          const a = item.address || {};
+          // Pick the most specific place name available
+          const city  = a.city || a.town || a.municipality || a.village ||
+                        a.suburb || a.county || a.district || item.name;
+          const state = a.state || "";
+          const label = state ? `${city}, ${state}` : city;
+          return { label, city };
+        })
+        .filter(({ label }) => {
+          if (!label || seen.has(label)) return false;
+          seen.add(label);
+          return true;
+        });
+      setOptions(places);
+    } catch {
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setInputValue(val);
+    onChange(val); // keep form state in sync as user types
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 400);
+    if (val.length >= 2) setOpen(true);
+    else setOpen(false);
+  };
+
+  const handleSelect = (place) => {
+    setInputValue(place.label);
+    onChange(place.label);
+    setOptions([]);
+    setOpen(false);
+  };
+
+  return (
+    <Box sx={{ position: "relative" }}>
+      <TextField
+        fullWidth size="small" label={label}
+        value={inputValue}
+        onChange={handleInput}
+        onFocus={() => inputValue.length >= 2 && options.length > 0 && setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 180)}
+        autoComplete="off"
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <LocationOn sx={{ fontSize: 16, color: "#8faabf" }} />
+            </InputAdornment>
+          ),
+          endAdornment: loading ? (
+            <InputAdornment position="end">
+              <CircularProgress size={14} sx={{ color: "#1a3c6e" }} />
+            </InputAdornment>
+          ) : null,
+        }}
+        sx={sx}
+      />
+      {open && options.length > 0 && (
+        <Box sx={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+          bgcolor: "#fff", borderRadius: "8px", zIndex: 9999,
+          boxShadow: "0 8px 24px rgba(26,60,110,0.14)",
+          border: "1px solid #d0dcea",
+          maxHeight: 220, overflowY: "auto",
+        }}>
+          {options.map((place, i) => (
+            <Box key={i} onMouseDown={() => handleSelect(place)}
+              sx={{
+                px: 2, py: 1.2, cursor: "pointer", fontSize: "0.855rem",
+                display: "flex", alignItems: "center", gap: 1.2,
+                color: "#1a2740",
+                "&:hover": { bgcolor: "#f0f5fb" },
+                borderBottom: i < options.length - 1 ? "1px solid #f0f4f8" : "none",
+              }}
+            >
+              <LocationOn sx={{ fontSize: 14, color: "#8faabf", flexShrink: 0 }} />
+              {place.label}
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Field style
@@ -246,6 +364,7 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
     const e = {};
     if (!form.firstName.trim())  e.firstName    = "First name is required";
     if (!form.lastName.trim())   e.lastName     = "Last name is required";
+    if (!form.employeeId.trim()) e.employeeId   = "Employee ID is required";
     if (!form.email.trim())      e.email        = "Email is required";
     else if (!isValidEmail(form.email)) e.email = "Enter a valid email address";
     if (form.phone && !isValidPhone(form.phone)) e.phone = "Enter a valid phone number";
@@ -313,7 +432,7 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
           </Box>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          
+          {/* Progress pill */}
           <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: 1 }}>
             <Box sx={{ width: 80, height: 4, bgcolor: "rgba(255,255,255,0.2)", borderRadius: 4, overflow: "hidden" }}>
               <Box sx={{ width: `${progress}%`, height: "100%", bgcolor: progress === 100 ? "#4ade80" : "#5baeff", borderRadius: 4, transition: "width 0.3s ease" }} />
@@ -344,7 +463,11 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               value={form.lastName} onChange={handleChange}
               error={!!errors.lastName} helperText={errors.lastName} sx={fsx} />
           </Field>
-         
+          <Field>
+            <TextField fullWidth size="small" name="employeeId" label="Employee ID *"
+              value={form.employeeId} onChange={handleChange}
+              error={!!errors.employeeId} helperText={errors.employeeId} sx={fsx} />
+          </Field>
         </Row>
 
         <Row>
@@ -375,9 +498,14 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               inputProps={{ maxLength: 15 }} sx={fsx} />
           </Field>
           <Field>
-            <TextField fullWidth size="small" name="homeTown" label="Home Town"
-              value={form.homeTown} onChange={handleChange} sx={fsx} />
+            <LocationAutocomplete
+              label="Home Town"
+              value={form.homeTown}
+              onChange={(v) => set("homeTown", v)}
+              sx={acSx}
+            />
           </Field>
+          <Field />
         </Row>
 
         {/* ─ Employment Details ──────────────────────────────────────── */}
@@ -397,22 +525,22 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               {STATUS_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
             </TextField>
           </Field>
-        </Row>
-
-        <Row>
           <Field>
             <TextField fullWidth size="small" name="overallExperience" label="Overall Experience (Yrs)"
               value={form.overallExperience} onChange={handleChange}
               inputProps={{ inputMode: "decimal" }}
               helperText={<Hint text="Numbers only" />} sx={fsx} />
           </Field>
+        </Row>
+
+        <Row>
           <Field>
             <TextField fullWidth size="small" name="relevantExperience" label="Relevant Experience (Yrs)"
               value={form.relevantExperience} onChange={handleChange}
               inputProps={{ inputMode: "decimal" }}
               helperText={<Hint text="Numbers only" />} sx={fsx} />
           </Field>
-          {/* <Field /><Field /> */}
+          <Field /><Field />
         </Row>
 
         {/* ─ Organization Details ────────────────────────────────────── */}
@@ -441,16 +569,20 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
 
         <Row>
           <Field>
-            <Autocomplete fullWidth size="small" options={LOCATION_OPTIONS}
-              value={form.baseLocation} freeSolo
-              onChange={(_, v) => set("baseLocation", v || "")}
-              renderInput={(params) => <TextField {...params} label="Base Location" sx={acSx} />} />
+            <LocationAutocomplete
+              label="Base Location"
+              value={form.baseLocation}
+              onChange={(v) => set("baseLocation", v)}
+              sx={acSx}
+            />
           </Field>
           <Field>
-            <Autocomplete fullWidth size="small" options={LOCATION_OPTIONS}
-              value={form.currentLocation} freeSolo
-              onChange={(_, v) => set("currentLocation", v || "")}
-              renderInput={(params) => <TextField {...params} label="Current Location" sx={acSx} />} />
+            <LocationAutocomplete
+              label="Current Location"
+              value={form.currentLocation}
+              onChange={(v) => set("currentLocation", v)}
+              sx={acSx}
+            />
           </Field>
           <Field>
             <TextField fullWidth size="small" select name="workMode" label="Work Mode"
