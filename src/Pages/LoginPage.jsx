@@ -18,11 +18,16 @@ import LockOutlineRoundedIcon from '@mui/icons-material/LockOutlineRounded'
 import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded'
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+const AUTH_TOKEN_STORAGE_KEY = 'employeeTrackerToken'
 
 function LoginPage({ onLoginSuccess }) {
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
 
   const handleChange = (event) => {
@@ -33,7 +38,7 @@ function LoginPage({ onLoginSuccess }) {
     }
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     if (!formData.email.trim() || !formData.password.trim()) {
@@ -47,8 +52,42 @@ function LoginPage({ onLoginSuccess }) {
     }
 
     setError('')
-    onLoginSuccess?.({ email: formData.email.trim() })
-    navigate('/dashboard')
+    setIsSubmitting(true)
+
+    try {
+      const payload = {
+        email: formData.email.trim(),
+        password: formData.password,
+      }
+
+      const { data } = await axios.post(`${API_BASE_URL}/api/auth/login`, payload)
+      const loginToken = data?.token ?? data?.accessToken ?? data?.data?.token
+
+      if (loginToken) {
+        localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, loginToken)
+      }
+
+      onLoginSuccess?.({
+        email: data?.email ?? payload.email,
+        token: loginToken,
+        ...data,
+      })
+      navigate('/dashboard')
+    } catch (requestError) {
+      if (!requestError?.response) {
+        setError(`Cannot reach API server at ${API_BASE_URL || 'current host'}. Ensure backend is running on port 5000.`)
+        return
+      }
+
+      const serverMessage =
+        requestError?.response?.data?.message ||
+        requestError?.response?.data?.error ||
+        requestError?.message
+
+      setError(serverMessage || 'Login failed. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -212,6 +251,7 @@ function LoginPage({ onLoginSuccess }) {
                   variant="contained"
                   fullWidth
                   size="large"
+                  disabled={isSubmitting}
                   sx={{
                     mt: 1,
                     py: 1.5,
@@ -227,7 +267,7 @@ function LoginPage({ onLoginSuccess }) {
                     },
                   }}
                 >
-                  Sign In
+                  {isSubmitting ? 'Signing In...' : 'Sign In'}
                 </Button>
 
                 <Typography variant="body2" color="text.secondary">
