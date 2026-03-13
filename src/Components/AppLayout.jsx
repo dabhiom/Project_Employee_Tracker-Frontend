@@ -6,7 +6,7 @@ import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import { NavLink, Outlet } from 'react-router-dom'
-
+//AppLayout.jsx file
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: <DashboardRoundedIcon fontSize="small" /> },
   { to: '/employees', label: 'Employees', icon: <GroupRoundedIcon fontSize="small" /> },
