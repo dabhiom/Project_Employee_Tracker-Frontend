@@ -42,7 +42,7 @@ export const updateProject  = (id, data)  => api.put(`/api/projects/${id}`, data
 export const deleteProject  = (id)        => api.delete(`/api/projects/${id}`);
 
 // ── Employees (for dropdowns) ───────────────────────────────────────────────
-export const getAllEmployees = () => api.get("/api/employees");
+export const getAllEmployees = () => api.get("/api/ddls/employees");
 
 // ── Clients (for dropdowns) ─────────────────────────────────────────────────
-export const getAllClients   = () => api.get("/api/clients");
+export const getAllClients   = () => api.get("/api/ddls/clients");  

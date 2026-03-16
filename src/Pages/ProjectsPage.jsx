@@ -32,6 +32,9 @@ const fmtDate = (val) => {
   }
 };
 
+const getClientName = (c) => typeof c === 'object' && c !== null ? (c.customerName || c.clientName || c.name || c.companyName || c._id) : (c || "");
+const getEmpName = (e) => typeof e === 'object' && e !== null ? (e.fullName || e.name || `${e.firstName||""} ${e.lastName||""}`.trim() || e.email || e._id) : (e || "");
+
 const InfoRow = ({ icon: Icon, label, value }) => (
   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
     <Icon sx={{ fontSize: 14, color: "#90a4ae" }} />
@@ -129,7 +132,8 @@ export default function ProjectsPage() {
     const q = search.toLowerCase();
     const matchSearch =
       (p.projectName || "").toLowerCase().includes(q) ||
-      (p.clientId    || "").toLowerCase().includes(q);
+      getClientName(p.clientId).toLowerCase().includes(q) ||
+      getEmpName(p.projectManagerId).toLowerCase().includes(q);
     const matchStatus = statusFilter === "All" || p.projectStatus === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -221,9 +225,9 @@ export default function ProjectsPage() {
                   <Typography variant="caption" color="text.secondary">#{row._id}</Typography>
                 </Box>
                 <Divider sx={{ borderColor: "#f0f4f8" }} />
-                <InfoRow icon={Business}      label="Client"  value={row.clientId} />
-                <InfoRow icon={Person}        label="Manager" value={row.projectManagerId} />
-                <InfoRow icon={Person}        label="Lead"    value={row.teamLeadId} />
+                <InfoRow icon={Business}      label="Client"  value={getClientName(row.clientId)} />
+                <InfoRow icon={Person}        label="Manager" value={getEmpName(row.projectManagerId)} />
+                <InfoRow icon={Person}        label="Lead"    value={getEmpName(row.teamLeadId)} />
                 <InfoRow icon={CalendarToday} label="Start"   value={fmtDate(row.projectStartDate)} />
                 <InfoRow icon={CalendarToday} label="End"     value={fmtDate(row.projectEndDate)} />
               </Box>
@@ -260,12 +264,12 @@ export default function ProjectsPage() {
                   <TableRow key={row._id} hover sx={{ "&:hover": { bgcolor: "#f0f7ff" }, bgcolor: idx % 2 === 0 ? "#fff" : "#fafbfc" }}>
                     <TableCell sx={{ fontSize: "0.82rem", color: "#888", py: 1.5 }}>{idx + 1}</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#1a3c6e", py: 1.5 }}>{row.projectName}</TableCell>
-                    <TableCell sx={{ fontSize: "0.85rem", py: 1.5 }}>{row.clientId || "N/A"}</TableCell>
+                    <TableCell sx={{ fontSize: "0.85rem", py: 1.5 }}>{getClientName(row.clientId) || "N/A"}</TableCell>
                     <TableCell sx={{ py: 1.5 }}>
                       <Chip label={row.projectType || "N/A"} color={TYPE_COLORS[row.projectType] || "default"} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.72rem" }} />
                     </TableCell>
-                    <TableCell sx={{ fontSize: "0.85rem", py: 1.5 }}>{row.projectManagerId || "N/A"}</TableCell>
-                    <TableCell sx={{ fontSize: "0.85rem", py: 1.5 }}>{row.teamLeadId || "N/A"}</TableCell>
+                    <TableCell sx={{ fontSize: "0.85rem", py: 1.5 }}>{getEmpName(row.projectManagerId) || "N/A"}</TableCell>
+                    <TableCell sx={{ fontSize: "0.85rem", py: 1.5 }}>{getEmpName(row.teamLeadId) || "N/A"}</TableCell>
                     {/* ── Formatted dates ── */}
                     <TableCell sx={{ fontSize: "0.82rem", py: 1.5 }}>{fmtDate(row.projectStartDate)}</TableCell>
                     <TableCell sx={{ fontSize: "0.82rem", py: 1.5 }}>{fmtDate(row.projectEndDate)}</TableCell>
