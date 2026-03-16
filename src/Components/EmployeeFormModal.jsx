@@ -364,7 +364,7 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
     const e = {};
     if (!form.firstName.trim())  e.firstName    = "First name is required";
     if (!form.lastName.trim())   e.lastName     = "Last name is required";
-    if (!form.employeeId.trim()) e.employeeId   = "Employee ID is required";
+    // if (!form.employeeId.trim()) e.employeeId   = "Employee ID is required";
     if (!form.email.trim())      e.email        = "Email is required";
     else if (!isValidEmail(form.email)) e.email = "Enter a valid email address";
     if (form.phone && !isValidPhone(form.phone)) e.phone = "Enter a valid phone number";
@@ -391,7 +391,7 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
   };
 
   /* ── Progress: how many required fields are filled ─────────────── */
-  const required = ["firstName", "lastName", "employeeId", "email", "designation", "dateOfJoining", "employeeStatus"];
+  const required = ["firstName", "lastName", "email", "designation", "dateOfJoining", "employeeStatus"];
   const filled   = required.filter((k) => form[k]?.toString().trim()).length;
   const progress = Math.round((filled / required.length) * 100);
 
@@ -463,11 +463,7 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               value={form.lastName} onChange={handleChange}
               error={!!errors.lastName} helperText={errors.lastName} sx={fsx} />
           </Field>
-          <Field>
-            <TextField fullWidth size="small" name="employeeId" label="Employee ID *"
-              value={form.employeeId} onChange={handleChange}
-              error={!!errors.employeeId} helperText={errors.employeeId} sx={fsx} />
-          </Field>
+       
         </Row>
 
         <Row>
@@ -505,7 +501,6 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               sx={acSx}
             />
           </Field>
-          <Field />
         </Row>
 
         {/* ─ Employment Details ──────────────────────────────────────── */}
@@ -525,12 +520,7 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               {STATUS_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
             </TextField>
           </Field>
-          <Field>
-            <TextField fullWidth size="small" name="overallExperience" label="Overall Experience (Yrs)"
-              value={form.overallExperience} onChange={handleChange}
-              inputProps={{ inputMode: "decimal" }}
-              helperText={<Hint text="Numbers only" />} sx={fsx} />
-          </Field>
+        
         </Row>
 
         <Row>
@@ -540,7 +530,13 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               inputProps={{ inputMode: "decimal" }}
               helperText={<Hint text="Numbers only" />} sx={fsx} />
           </Field>
-          <Field /><Field />
+            <Field>
+            <TextField fullWidth size="small" name="overallExperience" label="Overall Experience (Yrs)"
+              value={form.overallExperience} onChange={handleChange}
+              inputProps={{ inputMode: "decimal" }}
+              helperText={<Hint text="Numbers only" />} sx={fsx} />
+          </Field>
+          {/* <Field /><Field /> */}
         </Row>
 
         {/* ─ Organization Details ────────────────────────────────────── */}

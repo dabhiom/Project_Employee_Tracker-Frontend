@@ -286,7 +286,7 @@ export default function DesignationMaster() {
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
-        <FullWidthField>
+        {/* <FullWidthField> */}
           <TextField
             label="Description"
             fullWidth
@@ -296,7 +296,7 @@ export default function DesignationMaster() {
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
-        </FullWidthField>
+        {/* </FullWidthField> */}
       </MasterFormDialog>
 
       {/* ── Delete Dialog ─────────────────────────────────────────────────── */}

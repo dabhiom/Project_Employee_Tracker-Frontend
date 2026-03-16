@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Box, Button, Chip, Divider,
+  Box, Button, Chip, CircularProgress, Divider,
   IconButton, InputAdornment, MenuItem, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, TextField,
   Tooltip, Typography, useMediaQuery, useTheme,
@@ -14,15 +14,64 @@ import EmployeeFormModal from "../Components/EmployeeFormModal";
 import MasterDetailsModal from "../Components/MasterDetailsModal";
 import MasterDeleteDialog from "../Components/MasterDeleteDialog";
 import { useToast } from "../Components/ToastProvider";
+/* ── Inline API helpers ─────────────────────────────────────────────────── */
+const BASE = import.meta.env.VITE_API_BASE_URL;
+const authHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+});
 
-const STORAGE_KEY = "employees_data";
-const STATUS_COLORS = { Active: "success", Notice: "warning", Exited: "error" };
+/* ── API status codes → display ──────────────────────────────────────────
+   employeeStatus: "0" = Active, "1" = On Notice, "2" = Exited
+   gender:         "1" = Male,   "2" = Female
+────────────────────────────────────────────────────────────────────── */
+const STATUS_LABEL  = { "0": "Active", "1": "On Notice", "2": "Exited" };
+// Reverse: form text value → API code
+const STATUS_CODE   = { "Active": "0", "On Notice": "1", "Notice": "1", "Exited": "2" };
+const STATUS_COLORS = { "0": "success", "1": "warning",  "2": "error"  };
+const GENDER_LABEL  = { "1": "Male",    "2": "Female" };
+
+const fmtDate = (val) => {
+  if (!val) return "—";
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return val;
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  } catch { return val; }
+};
 const DESIGNATION_OPTIONS = ["Developer","Manager","Analyst","Designer","Team Lead","Senior Developer"];
 
-/* ── Avatar initials box ────────────────────────────────────────────────── */
+/* ── Normalise API employee → UI shape ───────────────────────────────────
+   Actual API fields:
+   { _id, employeeId, firstName, lastName, gender, dateOfBirth, email,
+     doj, role, employeeStatus, designationId, departmentId,
+     baseLocationId, currentLocationId, workMode, overallExperience,
+     relevantExperience, reportingManagerId, fullName, isActive }
+──────────────────────────────────────────────────────────────────────── */
+const normalise = (e) => ({
+  ...e,
+  // keep firstName / lastName as-is (API already sends them split)
+  firstName:    e.firstName  || (e.fullName || "").split(" ")[0] || "",
+  lastName:     e.lastName   || (e.fullName || "").split(" ").slice(1).join(" ") || "",
+  employeeId:   e.employeeId || e.empId || e._id,
+  dateOfJoining: e.doj || e.dateOfJoining || e.employeeStartDate || "",
+  // resolve IDs to display labels where API only sends IDs
+  // (real names would come from separate master lookups — show ID as fallback)
+  designation:  e.designation  || e.designationId  || "—",
+  department:   e.department   || e.departmentId   || "—",
+  baseLocation: e.baseLocation || e.baseLocationId || "—",
+  currentLocation: e.currentLocation || e.currentLocationId || "—",
+  reportingManager: e.reportingManager || e.reportingManagerId || "—",
+  // gender display
+  genderLabel:  GENDER_LABEL[e.gender] || e.gender || "—",
+  // status display label
+  statusLabel:  STATUS_LABEL[e.employeeStatus] || e.employeeStatus || "—",
+});
+
+/* ── Avatar initials box ─────────────────────────────────────────────── */
 const AvatarBox = ({ firstName, lastName, size = 34, fontSize = "0.8rem" }) => {
   const colors = ["#1a3c6e","#0f766e","#7c3aed","#be185d","#b45309","#0369a1"];
-  const idx    = ((firstName?.[0] || "").charCodeAt(0) + (lastName?.[0] || "").charCodeAt(0)) % colors.length;
+  const idx    = ((firstName?.[0] || "A").charCodeAt(0) + (lastName?.[0] || "A").charCodeAt(0)) % colors.length;
   return (
     <Box sx={{
       width: size, height: size, borderRadius: 1.5, flexShrink: 0,
@@ -34,7 +83,7 @@ const AvatarBox = ({ firstName, lastName, size = 34, fontSize = "0.8rem" }) => {
   );
 };
 
-/* ── Mobile card info row ───────────────────────────────────────────────── */
+/* ── Mobile card info row ────────────────────────────────────────────── */
 const InfoRow = ({ icon: Icon, label, value }) => (
   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
     <Icon sx={{ fontSize: 13, color: "#8faabf" }} />
@@ -45,83 +94,148 @@ const InfoRow = ({ icon: Icon, label, value }) => (
 
 /* ════════════════════════════════════════════════════════════════════════ */
 export default function EmployeesPage() {
-  const theme   = useTheme();
+  const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { showToast } = useToast();
 
   /* ── State ──────────────────────────────────────────────────────────── */
-  const [employees, setEmployees] = useState(() => {
-    try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : []; }
-    catch { return []; }
-  });
+  const [employees, setEmployees] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [search,       setSearch]       = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [designFilter, setDesignFilter] = useState("All");
+  const [formOpen,     setFormOpen]     = useState(false);
+  const [editData,     setEditData]     = useState(null);
+  const [detailOpen,   setDetailOpen]   = useState(false);
+  const [detailData,   setDetailData]   = useState(null);
+  const [deleteOpen,   setDeleteOpen]   = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(employees)); } catch {}
-  }, [employees]);
+  /* ── Fetch all employees ────────────────────────────────────────────── */
+  const fetchEmployees = async () => {
+    setLoading(true);
+    try {
+      const res  = await fetch(`${BASE}/api/employees`, { headers: authHeaders() });
+      const json = await res.json();
+      // handles { success, count, data: [...] }
+      const list =
+        Array.isArray(json.data) ? json.data :
+        Array.isArray(json)      ? json       :
+        [];
+      setEmployees(list.map(normalise));
+    } catch (err) {
+      showToast(
+        err?.status === 401 ? "Session expired — please log in again." : "Could not load employees.",
+        "error"
+      );
+      setEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const [search, setSearch]                 = useState("");
-  const [statusFilter, setStatusFilter]     = useState("All");
-  const [designFilter, setDesignFilter]     = useState("All");
-  const [formOpen, setFormOpen]             = useState(false);
-  const [editData, setEditData]             = useState(null);
-  const [detailOpen, setDetailOpen]         = useState(false);
-  const [detailData, setDetailData]         = useState(null);
-  const [deleteOpen, setDeleteOpen]         = useState(false);
-  const [deleteTarget, setDeleteTarget]     = useState(null);
+  useEffect(() => { fetchEmployees(); }, []);
 
   /* ── Filtered ───────────────────────────────────────────────────────── */
   const filtered = employees.filter((e) => {
     const name = `${e.firstName} ${e.lastName}`.toLowerCase();
     return (
-      (name.includes(search.toLowerCase()) || e.employeeId.toLowerCase().includes(search.toLowerCase())) &&
+      (name.includes(search.toLowerCase()) ||
+       (e.employeeId || "").toLowerCase().includes(search.toLowerCase())) &&
       (statusFilter === "All" || e.employeeStatus === statusFilter) &&
-      (designFilter  === "All" || e.designation    === designFilter)
+      (designFilter === "All" || e.designation    === designFilter)
     );
   });
 
   /* ── Handlers ───────────────────────────────────────────────────────── */
-  const handleAdd    = ()    => { setEditData(null); setFormOpen(true); };
-  const handleEdit   = (row) => { setEditData(row);  setFormOpen(true); };
-  const handleView   = (row) => { setDetailData(row); setDetailOpen(true); };
+  const handleAdd  = ()    => { setEditData(null); setFormOpen(true); };
+  const handleEdit = (row) => { setEditData(row);  setFormOpen(true); };
+  const handleView = (row) => { setDetailData(row); setDetailOpen(true); };
   const handleDelete = (row) => { setDeleteTarget(row); setDeleteOpen(true); };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setEmployees((p) => p.filter((e) => e._id !== deleteTarget._id));
-    setDeleteOpen(false); setDeleteTarget(null);
-    showToast("Employee deleted successfully", "success");
-  };
-
-  const handleSave = (formData) => {
-    if (editData) {
-      setEmployees((p) => p.map((e) => e._id === editData._id ? { ...formData, _id: editData._id } : e));
-      showToast("Employee updated successfully", "success");
-    } else {
-      setEmployees((p) => [...p, { ...formData, _id: Date.now().toString(), createdAt: new Date().toISOString().split("T")[0] }]);
-      showToast("Employee added successfully", "success");
+    try {
+      const res = await fetch(`${BASE}/api/employees/${deleteTarget._id}`, {
+        method: "DELETE", headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setEmployees((p) => p.filter((e) => e._id !== deleteTarget._id));
+      showToast("Employee deleted successfully", "success");
+    } catch {
+      showToast("Failed to delete employee", "error");
+    } finally {
+      setDeleteOpen(false);
+      setDeleteTarget(null);
     }
   };
 
-  /* ── Stats config — solid coloured cards so they always contrast ──── */
-  const activeCount  = employees.filter((e) => e.employeeStatus === "Active").length;
-  const noticeCount  = employees.filter((e) => e.employeeStatus === "Notice").length;
-  const exitedCount  = employees.filter((e) => e.employeeStatus === "Exited").length;
+  const handleSave = async (formData) => {
+    try {
+      if (editData) {
+        // Map UI form fields → API shape
+        const body = {
+          _id:               editData._id,
+          empId:             formData.employeeId   || formData.empId || "",
+          name:              `${formData.firstName || ""} ${formData.lastName || ""}`.trim(),
+          email:             formData.email        || "",
+          role:              formData.role         || "1",
+          designation:       formData.designation  || "",
+          department:        formData.department   || "",
+          employeeStatus:    STATUS_CODE[formData.employeeStatus] ?? formData.employeeStatus ?? "",
+          employeeStartDate: formData.dateOfJoining || formData.employeeStartDate || "",
+          workMode:          formData.workMode     || "",
+        };
+        const res     = await fetch(`${BASE}/api/employees/${editData._id}`, {
+          method: "PUT", headers: authHeaders(), body: JSON.stringify(body),
+        });
+        const json    = await res.json();
+        if (!res.ok) throw new Error(json.message || "Update failed");
+        const updated = normalise(json.data ?? json);
+        setEmployees((p) => p.map((e) => e._id === editData._id ? updated : e));
+        showToast("Employee updated successfully", "success");
+      } else {
+        const body = {
+          empId:             formData.employeeId   || formData.empId || "",
+          name:              `${formData.firstName || ""} ${formData.lastName || ""}`.trim(),
+          email:             formData.email        || "",
+          role:              formData.role         || "1",
+          designation:       formData.designation  || "",
+          department:        formData.department   || "",
+          employeeStatus:    STATUS_CODE[formData.employeeStatus] ?? formData.employeeStatus ?? "",
+          employeeStartDate: formData.dateOfJoining || formData.employeeStartDate || "",
+          workMode:          formData.workMode     || "",
+        };
+        const res     = await fetch(`${BASE}/api/employees`, {
+          method: "POST", headers: authHeaders(), body: JSON.stringify(body),
+        });
+        const json    = await res.json();
+        if (!res.ok) throw new Error(json.message || "Create failed");
+        const created = normalise(json.data ?? json);
+        setEmployees((p) => [...p, created]);
+        showToast("Employee added successfully", "success");
+      }
+    } catch (err) {
+      showToast(err?.message || "Failed to save employee", "error");
+    }
+  };
 
+  /* ── Stats ──────────────────────────────────────────────────────────── */
   const stats = [
     {
-      label: "Total Employees", value: employees.length,
+      label: "Total Employees", value: loading ? "…" : employees.length,
       icon: PeopleAlt,
       gradient: "linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)",
       accent: "#5baeff",
     },
     {
-      label: "Active", value: activeCount,
+      label: "Active", value: loading ? "…" : employees.filter((e) => e.employeeStatus === "0").length,
       icon: CheckCircle,
       gradient: "linear-gradient(135deg, #166534 0%, #15803d 100%)",
       accent: "#86efac",
     },
     {
-      label: "On Notice", value: noticeCount,
+      label: "On Notice", value: loading ? "…" : employees.filter((e) => e.employeeStatus === "1").length,
       icon: NotificationsActive,
       gradient: "linear-gradient(135deg, #92400e 0%, #b45309 100%)",
       accent: "#fcd34d",
@@ -158,14 +272,13 @@ export default function EmployeesPage() {
         </Button>
       </Box>
 
-      {/* ── Stat Cards — solid gradient so they pop off any background ── */}
+      {/* ── Stat Cards ──────────────────────────────────────────────────── */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: { xs: 1.5, sm: 2 }, mb: 3 }}>
         {stats.map((s) => {
           const Icon = s.icon;
           return (
             <Box key={s.label} sx={{
-              background: s.gradient,
-              borderRadius: "12px",
+              background: s.gradient, borderRadius: "12px",
               p: { xs: "14px 16px", sm: "18px 22px" },
               display: "flex", alignItems: "center", gap: { xs: 1.5, sm: 2 },
               boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
@@ -173,34 +286,15 @@ export default function EmployeesPage() {
               transition: "transform 0.18s, box-shadow 0.18s",
               "&:hover": { transform: "translateY(-2px)", boxShadow: "0 8px 24px rgba(0,0,0,0.18)" },
             }}>
-              {/* Decorative circle bg */}
-              <Box sx={{
-                position: "absolute", right: -16, top: -16,
-                width: 80, height: 80, borderRadius: "50%",
-                bgcolor: "rgba(255,255,255,0.07)",
-              }} />
-              <Box sx={{
-                width: { xs: 38, sm: 46 }, height: { xs: 38, sm: 46 },
-                borderRadius: "10px", bgcolor: "rgba(255,255,255,0.15)",
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              }}>
+              <Box sx={{ position: "absolute", right: -16, top: -16, width: 80, height: 80, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.07)" }} />
+              <Box sx={{ width: { xs: 38, sm: 46 }, height: { xs: 38, sm: 46 }, borderRadius: "10px", bgcolor: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Icon sx={{ color: "#fff", fontSize: { xs: 20, sm: 24 } }} />
               </Box>
               <Box>
-                <Typography fontWeight={800} color="#fff"
-                  fontSize={{ xs: "1.6rem", sm: "2rem" }} lineHeight={1}>
-                  {s.value}
-                </Typography>
-                <Typography sx={{ color: "rgba(255,255,255,0.75)", fontSize: { xs: "0.68rem", sm: "0.78rem" }, mt: 0.3, fontWeight: 500 }}>
-                  {s.label}
-                </Typography>
+                <Typography fontWeight={800} color="#fff" fontSize={{ xs: "1.6rem", sm: "2rem" }} lineHeight={1}>{s.value}</Typography>
+                <Typography sx={{ color: "rgba(255,255,255,0.75)", fontSize: { xs: "0.68rem", sm: "0.78rem" }, mt: 0.3, fontWeight: 500 }}>{s.label}</Typography>
               </Box>
-              {/* Accent dot */}
-              <Box sx={{
-                position: "absolute", right: 16, bottom: 14,
-                width: 8, height: 8, borderRadius: "50%", bgcolor: s.accent,
-                opacity: 0.8,
-              }} />
+              <Box sx={{ position: "absolute", right: 16, bottom: 14, width: 8, height: 8, borderRadius: "50%", bgcolor: s.accent, opacity: 0.8 }} />
             </Box>
           );
         })}
@@ -216,104 +310,72 @@ export default function EmployeesPage() {
       }}>
         <TextField placeholder="Search name or ID…" size="small" fullWidth={isMobile}
           value={search} onChange={(e) => setSearch(e.target.value)}
-          sx={{
-            minWidth: { sm: 230 },
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "8px", fontSize: "0.875rem",
-              "& fieldset": { borderColor: "#d0dcea" },
-              "&:hover fieldset": { borderColor: "#1a3c6e" },
-              "&.Mui-focused fieldset": { borderColor: "#1a3c6e" },
-            },
-          }}
+          sx={{ minWidth: { sm: 230 }, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: "0.875rem", "& fieldset": { borderColor: "#d0dcea" }, "&:hover fieldset": { borderColor: "#1a3c6e" }, "&.Mui-focused fieldset": { borderColor: "#1a3c6e" } } }}
           InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" sx={{ color: "#8faabf" }} /></InputAdornment> }} />
 
         <TextField select size="small" fullWidth={isMobile} value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          sx={{
-            minWidth: { sm: 135 },
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "8px", fontSize: "0.875rem",
-              "& fieldset": { borderColor: "#d0dcea" },
-              "&:hover fieldset": { borderColor: "#1a3c6e" },
-              "&.Mui-focused fieldset": { borderColor: "#1a3c6e" },
-            },
-          }}
+          sx={{ minWidth: { sm: 135 }, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: "0.875rem", "& fieldset": { borderColor: "#d0dcea" }, "&:hover fieldset": { borderColor: "#1a3c6e" }, "&.Mui-focused fieldset": { borderColor: "#1a3c6e" } } }}
           InputProps={{ startAdornment: <InputAdornment position="start"><FilterList fontSize="small" sx={{ color: "#8faabf" }} /></InputAdornment> }}>
-          {["All","Active","Notice","Exited"].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+          {[
+            { v: "All", l: "All" },
+            { v: "0",   l: "Active" },
+            { v: "1",   l: "On Notice" },
+            { v: "2",   l: "Exited" },
+          ].map((s) => <MenuItem key={s.v} value={s.v}>{s.l}</MenuItem>)}
         </TextField>
 
         <TextField select size="small" fullWidth={isMobile} value={designFilter}
           onChange={(e) => setDesignFilter(e.target.value)}
-          sx={{
-            minWidth: { sm: 148 },
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "8px", fontSize: "0.875rem",
-              "& fieldset": { borderColor: "#d0dcea" },
-              "&:hover fieldset": { borderColor: "#1a3c6e" },
-              "&.Mui-focused fieldset": { borderColor: "#1a3c6e" },
-            },
-          }}
+          sx={{ minWidth: { sm: 148 }, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: "0.875rem", "& fieldset": { borderColor: "#d0dcea" }, "&:hover fieldset": { borderColor: "#1a3c6e" }, "&.Mui-focused fieldset": { borderColor: "#1a3c6e" } } }}
           InputProps={{ startAdornment: <InputAdornment position="start"><Person fontSize="small" sx={{ color: "#8faabf" }} /></InputAdornment> }}>
           {["All", ...DESIGNATION_OPTIONS].map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
         </TextField>
 
-        <Box sx={{ ml: { sm: "auto" }, display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ ml: { sm: "auto" }, display: "flex", alignItems: "center" }}>
           <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap", fontSize: "0.8rem" }}>
             Showing <strong style={{ color: "#1a3c6e" }}>{filtered.length}</strong> of {employees.length}
           </Typography>
         </Box>
       </Paper>
 
+      {/* ── Loading spinner ──────────────────────────────────────────────── */}
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+          <CircularProgress sx={{ color: "#1a3c6e" }} />
+        </Box>
+      )}
+
       {/* ════════════════════════════════════════════════════════════════
           MOBILE CARDS
       ════════════════════════════════════════════════════════════════ */}
-      {isMobile && (
+      {!loading && isMobile && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {filtered.length === 0 ? (
-            <Paper elevation={0} sx={{
-              p: 5, textAlign: "center", borderRadius: "12px",
-              border: "1px dashed #c8d8ec", bgcolor: "#fff",
-            }}>
+            <Paper elevation={0} sx={{ p: 5, textAlign: "center", borderRadius: "12px", border: "1px dashed #c8d8ec", bgcolor: "#fff" }}>
               <PeopleAlt sx={{ fontSize: 42, color: "#c8d8ec", mb: 1 }} />
               <Typography color="text.secondary" fontWeight={600}>No employees found</Typography>
               <Typography variant="caption" color="text.disabled">Try adjusting filters or add a new employee</Typography>
             </Paper>
           ) : filtered.map((row) => (
-            <Paper key={row._id} elevation={0} sx={{
-              borderRadius: "14px", border: "1px solid #e0eaf5",
-              bgcolor: "#fff", overflow: "hidden",
-              transition: "box-shadow 0.2s",
-              "&:hover": { boxShadow: "0 4px 18px rgba(26,60,110,0.1)" },
-            }}>
-              <Box sx={{
-                background: "linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)",
-                px: 2, py: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
+            <Paper key={row._id} elevation={0} sx={{ borderRadius: "14px", border: "1px solid #e0eaf5", bgcolor: "#fff", overflow: "hidden", transition: "box-shadow 0.2s", "&:hover": { boxShadow: "0 4px 18px rgba(26,60,110,0.1)" } }}>
+              <Box sx={{ background: "linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)", px: 2, py: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Box>
-                  <Typography fontWeight={700} color="#fff" fontSize="0.92rem">
-                    {row.firstName} {row.lastName}
-                  </Typography>
+                  <Typography fontWeight={700} color="#fff" fontSize="0.92rem">{row.firstName} {row.lastName}</Typography>
                   <Typography fontSize="0.72rem" color="#93c5fd">{row.employeeId}</Typography>
                 </Box>
-                <Chip label={row.employeeStatus} color={STATUS_COLORS[row.employeeStatus] || "default"}
-                  size="small" sx={{ fontSize: "0.65rem", fontWeight: 700, height: 20 }} />
+                <Chip label={row.statusLabel} color={STATUS_COLORS[row.employeeStatus] || "default"} size="small" sx={{ fontSize: "0.65rem", fontWeight: 700, height: 20 }} />
               </Box>
               <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 0.8 }}>
-                <InfoRow icon={Business} label="Role"    value={`${row.designation}${row.department ? ` · ${row.department}` : ""}`} />
+                <InfoRow icon={Business} label="Role"    value={`${row.designation || ""}${row.department ? ` · ${row.department}` : ""}`} />
                 <InfoRow icon={Email}    label="Email"   value={row.email} />
                 <InfoRow icon={Phone}    label="Phone"   value={row.phone} />
                 <InfoRow icon={Person}   label="Manager" value={row.reportingManager} />
               </Box>
-              <Box sx={{
-                px: 2, py: 1, display: "flex", gap: 1, justifyContent: "flex-end",
-                bgcolor: "#f8fafc", borderTop: "1px solid #f0f4f8",
-              }}>
-                <Button size="small" startIcon={<Visibility sx={{ fontSize: "13px !important" }} />} onClick={() => handleView(row)}
-                  sx={{ textTransform: "none", color: "#1a3c6e", fontSize: "0.75rem", borderRadius: "6px", "&:hover": { bgcolor: "#eef3fb" } }}>View</Button>
-                <Button size="small" startIcon={<Edit sx={{ fontSize: "13px !important" }} />} onClick={() => handleEdit(row)}
-                  sx={{ textTransform: "none", color: "#2563eb", fontSize: "0.75rem", borderRadius: "6px", "&:hover": { bgcolor: "#eff6ff" } }}>Edit</Button>
-                <Button size="small" startIcon={<Delete sx={{ fontSize: "13px !important" }} />} onClick={() => handleDelete(row)}
-                  sx={{ textTransform: "none", color: "#dc2626", fontSize: "0.75rem", borderRadius: "6px", "&:hover": { bgcolor: "#fef2f2" } }}>Delete</Button>
+              <Box sx={{ px: 2, py: 1, display: "flex", gap: 1, justifyContent: "flex-end", bgcolor: "#f8fafc", borderTop: "1px solid #f0f4f8" }}>
+                <Button size="small" startIcon={<Visibility sx={{ fontSize: "13px !important" }} />} onClick={() => handleView(row)} sx={{ textTransform: "none", color: "#1a3c6e", fontSize: "0.75rem", borderRadius: "6px", "&:hover": { bgcolor: "#eef3fb" } }}>View</Button>
+                <Button size="small" startIcon={<Edit sx={{ fontSize: "13px !important" }} />} onClick={() => handleEdit(row)} sx={{ textTransform: "none", color: "#2563eb", fontSize: "0.75rem", borderRadius: "6px", "&:hover": { bgcolor: "#eff6ff" } }}>Edit</Button>
+                <Button size="small" startIcon={<Delete sx={{ fontSize: "13px !important" }} />} onClick={() => handleDelete(row)} sx={{ textTransform: "none", color: "#dc2626", fontSize: "0.75rem", borderRadius: "6px", "&:hover": { bgcolor: "#fef2f2" } }}>Delete</Button>
               </Box>
             </Paper>
           ))}
@@ -323,19 +385,14 @@ export default function EmployeesPage() {
       {/* ════════════════════════════════════════════════════════════════
           DESKTOP TABLE
       ════════════════════════════════════════════════════════════════ */}
-      {!isMobile && (
+      {!loading && !isMobile && (
         <Paper elevation={0} sx={{ borderRadius: "10px", border: "1px solid #e0eaf5", overflow: "hidden" }}>
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
                   {["#","Employee","Designation","Department","Work Mode","Status","Contact","Actions"].map((h) => (
-                    <TableCell key={h} sx={{
-                      bgcolor: "#1a3c6e", color: "#fff", fontWeight: 700,
-                      fontSize: "0.72rem", letterSpacing: 0.6,
-                      whiteSpace: "nowrap", py: 1.75, borderBottom: "none",
-                      "&:first-of-type": { pl: 2.5 },
-                    }}>{h}</TableCell>
+                    <TableCell key={h} sx={{ bgcolor: "#1a3c6e", color: "#fff", fontWeight: 700, fontSize: "0.72rem", letterSpacing: 0.6, whiteSpace: "nowrap", py: 1.75, borderBottom: "none", "&:first-of-type": { pl: 2.5 } }}>{h}</TableCell>
                   ))}
                 </TableRow>
               </TableHead>
@@ -345,86 +402,47 @@ export default function EmployeesPage() {
                     <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
                       <PeopleAlt sx={{ fontSize: 44, color: "#d0dcea", mb: 1.5, display: "block", mx: "auto" }} />
                       <Typography color="text.secondary" fontWeight={600} fontSize="0.95rem">No employees found</Typography>
-                      <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
-                        Try adjusting filters or add a new employee
-                      </Typography>
+                      <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>Try adjusting filters or add a new employee</Typography>
                     </TableCell>
                   </TableRow>
                 ) : filtered.map((row, idx) => (
-                  <TableRow key={row._id} sx={{
-                    bgcolor: idx % 2 === 0 ? "#fff" : "#fafbfd",
-                    "&:hover": { bgcolor: "#f0f6ff" },
-                    "& td": { borderColor: "#f0f4f8" },
-                    transition: "background 0.15s",
-                  }}>
-                    {/* # */}
-                    <TableCell sx={{ fontSize: "0.78rem", color: "#aab8cc", py: 1.75, fontWeight: 600, pl: 2.5 }}>
-                      {idx + 1}
-                    </TableCell>
-                    {/* Employee */}
+                  <TableRow key={row._id} sx={{ bgcolor: idx % 2 === 0 ? "#fff" : "#fafbfd", "&:hover": { bgcolor: "#f0f6ff" }, "& td": { borderColor: "#f0f4f8" }, transition: "background 0.15s" }}>
+                    <TableCell sx={{ fontSize: "0.78rem", color: "#aab8cc", py: 1.75, fontWeight: 600, pl: 2.5 }}>{idx + 1}</TableCell>
                     <TableCell sx={{ py: 1.75 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <AvatarBox firstName={row.firstName} lastName={row.lastName} />
                         <Box>
-                          <Typography fontWeight={700} color="#1a2740" fontSize="0.875rem">
-                            {row.firstName} {row.lastName}
-                          </Typography>
+                          <Typography fontWeight={700} color="#1a2740" fontSize="0.875rem">{row.firstName} {row.lastName}</Typography>
                           <Typography fontSize="0.72rem" color="#8faabf" fontWeight={500}>{row.employeeId}</Typography>
                         </Box>
                       </Box>
                     </TableCell>
-                    {/* Designation */}
-                    <TableCell sx={{ fontSize: "0.84rem", py: 1.75, color: "#2a3e5a", fontWeight: 500 }}>
-                      {row.designation || "—"}
-                    </TableCell>
-                    {/* Department */}
-                    <TableCell sx={{ fontSize: "0.84rem", py: 1.75, color: "#4a5e78" }}>
-                      {row.department || "—"}
-                    </TableCell>
-                    {/* Work Mode */}
+                    <TableCell sx={{ fontSize: "0.84rem", py: 1.75, color: "#2a3e5a", fontWeight: 500 }}>{row.designation || "—"}</TableCell>
+                    <TableCell sx={{ fontSize: "0.84rem", py: 1.75, color: "#4a5e78" }}>{row.department || "—"}</TableCell>
                     <TableCell sx={{ py: 1.75 }}>
                       {row.workMode ? (
-                        <Box sx={{
-                          display: "inline-flex", alignItems: "center",
-                          px: 1.5, py: 0.4, borderRadius: "6px",
-                          bgcolor: "#eef3fb", color: "#1a3c6e",
-                          fontSize: "0.73rem", fontWeight: 700, letterSpacing: 0.3,
-                        }}>
+                        <Box sx={{ display: "inline-flex", alignItems: "center", px: 1.5, py: 0.4, borderRadius: "6px", bgcolor: "#eef3fb", color: "#1a3c6e", fontSize: "0.73rem", fontWeight: 700, letterSpacing: 0.3 }}>
                           {row.workMode}
                         </Box>
                       ) : "—"}
                     </TableCell>
-                    {/* Status */}
                     <TableCell sx={{ py: 1.75 }}>
-                      <Chip label={row.employeeStatus}
-                        color={STATUS_COLORS[row.employeeStatus] || "default"}
-                        size="small" sx={{ fontWeight: 700, fontSize: "0.7rem", height: 22 }} />
+                      <Chip label={row.statusLabel} color={STATUS_COLORS[row.employeeStatus] || "default"} size="small" sx={{ fontWeight: 700, fontSize: "0.7rem", height: 22 }} />
                     </TableCell>
-                    {/* Contact */}
                     <TableCell sx={{ py: 1.75 }}>
                       <Typography fontSize="0.8rem" fontWeight={600} color="#1a2740">{row.email}</Typography>
                       <Typography fontSize="0.72rem" color="#8faabf" mt={0.2}>{row.phone}</Typography>
                     </TableCell>
-                    {/* Actions */}
                     <TableCell sx={{ py: 1.75 }}>
                       <Box sx={{ display: "flex", gap: 0.25 }}>
                         <Tooltip title="View Details" arrow>
-                          <IconButton size="small" onClick={() => handleView(row)}
-                            sx={{ color: "#1a3c6e", borderRadius: "6px", "&:hover": { bgcolor: "#eef3fb" } }}>
-                            <Visibility sx={{ fontSize: 17 }} />
-                          </IconButton>
+                          <IconButton size="small" onClick={() => handleView(row)} sx={{ color: "#1a3c6e", borderRadius: "6px", "&:hover": { bgcolor: "#eef3fb" } }}><Visibility sx={{ fontSize: 17 }} /></IconButton>
                         </Tooltip>
                         <Tooltip title="Edit" arrow>
-                          <IconButton size="small" onClick={() => handleEdit(row)}
-                            sx={{ color: "#2563eb", borderRadius: "6px", "&:hover": { bgcolor: "#eff6ff" } }}>
-                            <Edit sx={{ fontSize: 17 }} />
-                          </IconButton>
+                          <IconButton size="small" onClick={() => handleEdit(row)} sx={{ color: "#2563eb", borderRadius: "6px", "&:hover": { bgcolor: "#eff6ff" } }}><Edit sx={{ fontSize: 17 }} /></IconButton>
                         </Tooltip>
                         <Tooltip title="Delete" arrow>
-                          <IconButton size="small" onClick={() => handleDelete(row)}
-                            sx={{ color: "#dc2626", borderRadius: "6px", "&:hover": { bgcolor: "#fef2f2" } }}>
-                            <Delete sx={{ fontSize: 17 }} />
-                          </IconButton>
+                          <IconButton size="small" onClick={() => handleDelete(row)} sx={{ color: "#dc2626", borderRadius: "6px", "&:hover": { bgcolor: "#fef2f2" } }}><Delete sx={{ fontSize: 17 }} /></IconButton>
                         </Tooltip>
                       </Box>
                     </TableCell>
@@ -434,12 +452,8 @@ export default function EmployeesPage() {
             </Table>
           </TableContainer>
 
-          {/* Table footer row count */}
           {filtered.length > 0 && (
-            <Box sx={{
-              px: 2.5, py: 1.25, bgcolor: "#fafbfd", borderTop: "1px solid #f0f4f8",
-              display: "flex", alignItems: "center",
-            }}>
+            <Box sx={{ px: 2.5, py: 1.25, bgcolor: "#fafbfd", borderTop: "1px solid #f0f4f8", display: "flex", alignItems: "center" }}>
               <Typography fontSize="0.75rem" color="text.secondary">
                 Showing <strong style={{ color: "#1a3c6e" }}>{filtered.length}</strong> of {employees.length} employees
               </Typography>
@@ -456,50 +470,35 @@ export default function EmployeesPage() {
         title="Employee Details" onEdit={() => { setDetailOpen(false); handleEdit(detailData); }}>
         {detailData && (
           <Box>
-            {/* Profile badge */}
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 2, p: 2.5, mb: 3, mt: 2,
-              background: "linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)",
-              borderRadius: "10px",
-            }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, p: 2.5, mb: 3, mt: 2, background: "linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)", borderRadius: "10px" }}>
               <AvatarBox firstName={detailData.firstName} lastName={detailData.lastName} size={52} fontSize="1.1rem" />
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography fontWeight={800} color="#fff" fontSize="1.05rem">
-                  {detailData.firstName} {detailData.lastName}
-                </Typography>
-                <Typography fontSize="0.8rem" sx={{ color: "rgba(255,255,255,0.75)", mt: 0.2 }}>
-                  {detailData.designation}{detailData.department ? ` · ${detailData.department}` : ""}
-                </Typography>
+                <Typography fontWeight={800} color="#fff" fontSize="1.05rem">{detailData.firstName} {detailData.lastName}</Typography>
+                <Typography fontSize="0.8rem" sx={{ color: "rgba(255,255,255,0.75)", mt: 0.2 }}>{detailData.designation}{detailData.department ? ` · ${detailData.department}` : ""}</Typography>
                 <Typography fontSize="0.72rem" sx={{ color: "rgba(255,255,255,0.5)", mt: 0.1 }}>{detailData.employeeId}</Typography>
               </Box>
-              <Chip label={detailData.employeeStatus}
-                color={STATUS_COLORS[detailData.employeeStatus] || "default"}
-                size="small" sx={{ fontWeight: 700, fontSize: "0.72rem" }} />
+              <Chip label={detailData.statusLabel} color={STATUS_COLORS[detailData.employeeStatus] || "default"} size="small" sx={{ fontWeight: 700, fontSize: "0.72rem" }} />
             </Box>
 
-            {/* Basic */}
             <SectionHead>Basic Information</SectionHead>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5, mb: 3 }}>
-              <MasterDetailsModal.DetailItem label="First Name"   value={detailData.firstName} />
-              <MasterDetailsModal.DetailItem label="Last Name"    value={detailData.lastName} />
-              <MasterDetailsModal.DetailItem label="Employee ID"  value={detailData.employeeId} />
-              <MasterDetailsModal.DetailItem label="Gender"       value={detailData.gender} />
-              <MasterDetailsModal.DetailItem label="Email"        value={detailData.email} />
-              <MasterDetailsModal.DetailItem label="Phone"        value={detailData.phone} />
-              <MasterDetailsModal.DetailItem label="Home Town"    value={detailData.homeTown} />
-              <MasterDetailsModal.DetailItem label="Date of Birth" value={detailData.dateOfBirth} />
+              <MasterDetailsModal.DetailItem label="Full Name"     value={detailData.name || `${detailData.firstName} ${detailData.lastName}`} />
+              <MasterDetailsModal.DetailItem label="Employee ID"   value={detailData.employeeId} />
+              <MasterDetailsModal.DetailItem label="Email"         value={detailData.email} />
+              <MasterDetailsModal.DetailItem label="Phone"         value={detailData.phone} />
+              <MasterDetailsModal.DetailItem label="Gender"        value={detailData.genderLabel} />
+              <MasterDetailsModal.DetailItem label="Date of Birth" value={fmtDate(detailData.dateOfBirth)} />
+              <MasterDetailsModal.DetailItem label="Home Town"     value={detailData.homeTown} />
             </Box>
 
-            {/* Employment */}
             <SectionHead>Employment Details</SectionHead>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5, mb: 3 }}>
-              <MasterDetailsModal.DetailItem label="Date of Joining"      value={detailData.dateOfJoining} />
-              <MasterDetailsModal.DetailItem label="Status"               value={detailData.employeeStatus} />
-              <MasterDetailsModal.DetailItem label="Overall Experience"   value={detailData.overallExperience ? `${detailData.overallExperience} yrs` : "—"} />
-              <MasterDetailsModal.DetailItem label="Relevant Experience"  value={detailData.relevantExperience ? `${detailData.relevantExperience} yrs` : "—"} />
+              <MasterDetailsModal.DetailItem label="Date of Joining"     value={fmtDate(detailData.dateOfJoining || detailData.doj)} />
+              <MasterDetailsModal.DetailItem label="Status"              value={detailData.statusLabel} />
+              <MasterDetailsModal.DetailItem label="Overall Experience"  value={detailData.overallExperience ? `${detailData.overallExperience} yrs` : "—"} />
+              <MasterDetailsModal.DetailItem label="Relevant Experience" value={detailData.relevantExperience ? `${detailData.relevantExperience} yrs` : "—"} />
             </Box>
 
-            {/* Organization */}
             <SectionHead>Organization Details</SectionHead>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
               <MasterDetailsModal.DetailItem label="Designation"       value={detailData.designation} />
@@ -514,25 +513,18 @@ export default function EmployeesPage() {
       </MasterDetailsModal>
 
       {/* ── Delete Dialog ───────────────────────────────────────────────── */}
-      <MasterDeleteDialog
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={confirmDelete}
-        itemName="employee"
-      />
+      <MasterDeleteDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={confirmDelete} itemName="employee" />
     </Box>
   );
 }
 
-/* ── Internal section heading used in details modal ────────────────────── */
+/* ── Section heading ─────────────────────────────────────────────────── */
 function SectionHead({ children }) {
   return (
     <Box sx={{ mb: 1.5 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Box sx={{ width: 3, height: 13, bgcolor: "#1a3c6e", borderRadius: 4 }} />
-        <Typography sx={{ fontSize: "0.65rem", fontWeight: 800, color: "#1a3c6e", letterSpacing: 1.6, textTransform: "uppercase" }}>
-          {children}
-        </Typography>
+        <Typography sx={{ fontSize: "0.65rem", fontWeight: 800, color: "#1a3c6e", letterSpacing: 1.6, textTransform: "uppercase" }}>{children}</Typography>
       </Box>
       <Divider sx={{ mt: 0.75, mb: 1.5, borderColor: "#dce8f5" }} />
     </Box>
