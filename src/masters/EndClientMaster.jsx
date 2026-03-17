@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Button,
+  Chip,
   InputAdornment,
   Paper,
   Table,
@@ -16,29 +17,27 @@ import {
   useMediaQuery,
   useTheme,
   IconButton,
-  Snackbar,
-  Alert,
+  CircularProgress,
 } from "@mui/material";
 import { Add, Search, Visibility, Edit, Delete } from "@mui/icons-material";
 
 import MasterDetailsModal, { Section, DetailItem, TwoCol } from "../Components/MasterDetailsModal";
-import MasterFormDialog, { FullWidthField } from "../Components/MasterFormDialog";
+import MasterFormDialog from "../Components/MasterFormDialog";
+import { useToast } from "../Components/ToastProvider";
 import MasterDeleteDialog from "../Components/MasterDeleteDialog";
 import MobileCard from "../Components/MobileCard";
+
+const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/end-clients`;
 
 export default function EndClientMaster() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const { showToast } = useToast();
 
   /* ── State ───────────────────────────────────────────────────────────── */
-  const [clients, setClients] = useState(() => {
-    try {
-      const stored = localStorage.getItem("endClients");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -47,31 +46,56 @@ export default function EndClientMaster() {
   const [detailData, setDetailData] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "" });
-  const [toast, setToast] = useState({ open: false, message: "", severity: "success" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", status: true });
 
-  /* ── Persist ─────────────────────────────────────────────────────────── */
+  /* ── Auth headers ────────────────────────────────────────────────────── */
+  const authHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+  });
+
+  /* ── Fetch all end clients ───────────────────────────────────────────── */
+  const fetchClients = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(API_URL, { headers: authHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch end clients");
+      const data = await res.json();
+      setClients(Array.isArray(data) ? data : data.data ?? []);
+    } catch (err) {
+      showToast(err.message || "Error fetching end clients", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
   useEffect(() => {
-    localStorage.setItem("endClients", JSON.stringify(clients));
-  }, [clients]);
+    fetchClients();
+  }, [fetchClients]);
 
   /* ── Filtered list ───────────────────────────────────────────────────── */
   const filtered = clients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone.includes(search)
+    (c.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (c.email || "").toLowerCase().includes(search.toLowerCase()) ||
+    (c.phone || "").includes(search)
   );
 
   /* ── Handlers ────────────────────────────────────────────────────────── */
   const handleAdd = () => {
     setEditData(null);
-    setForm({ name: "", email: "", phone: "", address: "" });
+    setForm({ name: "", email: "", phone: "", address: "", status: true });
     setFormOpen(true);
   };
 
   const handleEdit = (client) => {
     setEditData(client);
-    setForm({ name: client.name, email: client.email, phone: client.phone, address: client.address });
+    setForm({
+      name: client.name ?? "",
+      email: client.email ?? "",
+      phone: client.phone ?? "",
+      address: client.address ?? "",
+      status: client.status ?? true,
+    });
     setFormOpen(true);
   };
 
@@ -85,33 +109,74 @@ export default function EndClientMaster() {
     setDeleteOpen(true);
   };
 
-  const handleDelete = () => {
-    setClients(clients.filter((c) => c._id !== deleteId));
-    setDeleteOpen(false);
-    setToast({ open: true, message: "End Client deleted successfully", severity: "success" });
+  /* ── Delete ──────────────────────────────────────────────────────────── */
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`${API_URL}/${deleteId}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to delete end client");
+      setClients((prev) => prev.filter((c) => c._id !== deleteId));
+      showToast("End Client deleted successfully", "success");
+    } catch (err) {
+      showToast(err.message || "Error deleting end client", "error");
+    } finally {
+      setDeleteOpen(false);
+    }
   };
 
-  const handleSave = () => {
+  /* ── Save (Create / Update) ──────────────────────────────────────────── */
+  const handleSave = async () => {
     if (!form.name.trim()) {
-      setToast({ open: true, message: "Client name is required", severity: "error" });
+      showToast("Client name is required", "error");
       return;
     }
     const duplicate = clients.find(
-      (c) => c.name.toLowerCase() === form.name.toLowerCase() &&
+      (c) =>
+        c.name.toLowerCase() === form.name.toLowerCase() &&
         (!editData || c._id !== editData._id)
     );
     if (duplicate) {
-      setToast({ open: true, message: "End Client already exists", severity: "error" });
+      showToast("End Client already exists", "error");
       return;
     }
-    if (editData) {
-      setClients(clients.map((c) => c._id === editData._id ? { ...c, ...form } : c));
-      setToast({ open: true, message: "End Client updated successfully", severity: "success" });
-    } else {
-      setClients([...clients, { _id: Date.now().toString(), ...form }]);
-      setToast({ open: true, message: "End Client created successfully", severity: "success" });
+
+    setSaving(true);
+    try {
+      if (editData) {
+        /* ── PUT ── */
+        const res = await fetch(`${API_URL}/${editData._id}`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error("Failed to update end client");
+        const updated = await res.json();
+        setClients((prev) =>
+          prev.map((c) =>
+            c._id === editData._id ? { ...c, ...(updated.data ?? updated) } : c
+          )
+        );
+        showToast("End Client updated successfully", "success");
+      } else {
+        /* ── POST ── */
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error("Failed to create end client");
+        const created = await res.json();
+        setClients((prev) => [...prev, created.data ?? created]);
+        showToast("End Client created successfully", "success");
+      }
+      setFormOpen(false);
+    } catch (err) {
+      showToast(err.message || "Error saving end client", "error");
+    } finally {
+      setSaving(false);
     }
-    setFormOpen(false);
   };
 
   /* ═══════════════════════════════════════════════════════════════════════ */
@@ -176,8 +241,15 @@ export default function EndClientMaster() {
         }}
       />
 
+      {/* ── Loading State ────────────────────────────────────────────────── */}
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+          <CircularProgress size={32} sx={{ color: "#1a3c6e" }} />
+        </Box>
+      )}
+
       {/* ── Desktop Table ────────────────────────────────────────────────── */}
-      {!isMobile && (
+      {!isMobile && !loading && (
         <Paper
           elevation={0}
           sx={{ border: "1px solid #e0e9f5", borderRadius: 1, overflow: "hidden" }}
@@ -186,7 +258,7 @@ export default function EndClientMaster() {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  {["#", "Name", "Email", "Phone", "Address", "Actions"].map((h) => (
+                  {["#", "Name", "Email", "Phone", "Address", "Status", "Actions"].map((h) => (
                     <TableCell
                       key={h}
                       sx={{
@@ -206,7 +278,7 @@ export default function EndClientMaster() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 5, color: "text.secondary" }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 5, color: "text.secondary" }}>
                       No end clients found.
                     </TableCell>
                   </TableRow>
@@ -225,6 +297,18 @@ export default function EndClientMaster() {
                       <TableCell sx={{ color: "text.secondary" }}>{row.email || "—"}</TableCell>
                       <TableCell sx={{ color: "text.secondary" }}>{row.phone || "—"}</TableCell>
                       <TableCell sx={{ color: "text.secondary" }}>{row.address || "—"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={row.status ? "Active" : "Inactive"}
+                          size="small"
+                          sx={{
+                            bgcolor: row.status ? "#e8f5e9" : "#ffebee",
+                            color: row.status ? "#2e7d32" : "#c62828",
+                            fontWeight: 600,
+                            fontSize: "0.75rem",
+                          }}
+                        />
+                      </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         <Tooltip title="View">
                           <IconButton size="small" onClick={() => handleView(row)} sx={{ color: "#4caf50", "&:hover": { bgcolor: "#e8f5e9" } }}>
@@ -252,7 +336,7 @@ export default function EndClientMaster() {
       )}
 
       {/* ── Mobile Cards ─────────────────────────────────────────────────── */}
-      {isMobile && (
+      {isMobile && !loading && (
         <Box>
           {filtered.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 6, color: "text.secondary" }}>
@@ -268,6 +352,7 @@ export default function EndClientMaster() {
                   { label: "Email", value: row.email },
                   { label: "Phone", value: row.phone },
                   { label: "Address", value: row.address },
+                  { label: "Status", value: row.status ? "Active" : "Inactive" },
                 ]}
                 onView={() => handleView(row)}
                 onEdit={() => handleEdit(row)}
@@ -285,6 +370,7 @@ export default function EndClientMaster() {
         title={editData ? "Edit End Client" : "Add End Client"}
         onSave={handleSave}
         saveLabel={editData ? "Update" : "Save"}
+        saving={saving}
       >
         <TextField
           label="Name *"
@@ -308,17 +394,31 @@ export default function EndClientMaster() {
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
         />
-        {/* <FullWidthField> */}
-          <TextField
-            label="Address"
-            fullWidth
+        <TextField
+          label="Address"
+          fullWidth
+          size="small"
+          multiline
+          rows={2}
+          value={form.address}
+          onChange={(e) => setForm({ ...form, address: e.target.value })}
+        />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+          <Typography variant="body2" color="text.secondary">Status:</Typography>
+          <Chip
+            label={form.status ? "Active" : "Inactive"}
             size="small"
-            multiline
-            rows={2}
-            value={form.address}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            onClick={() => setForm({ ...form, status: !form.status })}
+            sx={{
+              cursor: "pointer",
+              bgcolor: form.status ? "#e8f5e9" : "#ffebee",
+              color: form.status ? "#2e7d32" : "#c62828",
+              fontWeight: 600,
+              fontSize: "0.75rem",
+              "&:hover": { opacity: 0.85 },
+            }}
           />
-        {/* </FullWidthField> */}
+        </Box>
       </MasterFormDialog>
 
       {/* ── Delete Dialog ─────────────────────────────────────────────────── */}
@@ -357,21 +457,15 @@ export default function EndClientMaster() {
                 <DetailItem label="Address" value={detailData.address} />
               </Box>
             </TwoCol>
+            <TwoCol>
+              <Box sx={{ flex: 1 }}>
+                <DetailItem label="Status" value={detailData.status ? "Active" : "Inactive"} />
+              </Box>
+              <Box sx={{ flex: 1 }} />
+            </TwoCol>
           </>
         )}
       </MasterDetailsModal>
-
-      {/* ── Snackbar ─────────────────────────────────────────────────────── */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast({ ...toast, open: false })}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert severity={toast.severity} sx={{ width: "100%" }}>
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }
