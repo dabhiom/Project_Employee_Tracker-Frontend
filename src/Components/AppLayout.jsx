@@ -55,7 +55,7 @@ const masterItems = [
   { to: '/master/designation', label: 'Designation Master', icon: <BadgeRoundedIcon fontSize="small" /> },
   { to: '/master/end-client', label: 'End-Client Master', icon: <ApartmentRoundedIcon fontSize="small" /> },
   { to: '/master/manager', label: 'Manager Master', icon: <GroupsRoundedIcon fontSize="small" /> },
-  { to: '/master/customer', label: 'Customer Master', icon: <BusinessRoundedIcon fontSize="small" /> },
+  // { to: '/master/customer', label: 'Customer Master', icon: <BusinessRoundedIcon fontSize="small" /> },
 ]
 
 const floatBlob = keyframes`
