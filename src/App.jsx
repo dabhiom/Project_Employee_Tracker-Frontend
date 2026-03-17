@@ -13,6 +13,13 @@ import EndClientMaster from "./masters/EndClientMaster";
 import CustomerMaster from "./masters/CustomerMaster";
 import ManagerMaster from "./masters/ManagerMaster";
 import ResourcePage from "./Pages/ResourcePage";
+import ApplyLeave from "./Pages/LeaveComponents/ApplyLeave";
+import MyLeaves from "./Pages/LeaveComponents/MyLeaves";
+import LeaveDashboard from "./Pages/LeaveComponents/LeaveDashboard";
+import TimesheetEntry from "./Pages/LeaveComponents/TimesheetEntry";
+import TimesheetHistory from "./Pages/LeaveComponents/TimesheetHistory";
+import LeaveSettings from "./Pages/LeaveComponents/Settings";
+import { LeaveProvider } from "./Context/LeaveContext";
 import { useMemo, useState } from "react";
 
 const AUTH_STORAGE_KEY = "employeeTrackerAuth";
@@ -51,6 +58,7 @@ function App() {
 
   return (
     <ToastProvider>
+    <LeaveProvider currentUser={authState.user}>
       <BrowserRouter>
         <Routes>
           <Route
@@ -82,6 +90,12 @@ function App() {
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/resource" element={<ResourcePage />} />
               <Route path="/leave" element={<LeavePage />} />
+              <Route path="/leave/apply" element={<ApplyLeave />} />
+              <Route path="/leave/my-leaves" element={<MyLeaves />} />
+              <Route path="/leave/dashboard" element={<LeaveDashboard />} />
+              <Route path="/leave/timesheet" element={<TimesheetEntry />} />
+              <Route path="/leave/timesheet-history" element={<TimesheetHistory />} />
+              <Route path="/leave/settings" element={<LeaveSettings />} />
               <Route path="/finance" element={<FinancePage />} />
               <Route
                 path="/master/designation"
@@ -104,6 +118,7 @@ function App() {
           />
         </Routes>
       </BrowserRouter>
+      </LeaveProvider>
     </ToastProvider>
   );
 }
