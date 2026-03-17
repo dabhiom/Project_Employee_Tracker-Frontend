@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Button,
+  Chip,
   InputAdornment,
   Paper,
   Table,
@@ -16,62 +17,83 @@ import {
   useMediaQuery,
   useTheme,
   IconButton,
-  Snackbar,
-  Alert,
+  CircularProgress,
 } from "@mui/material";
 import { Add, Search, Visibility, Edit, Delete } from "@mui/icons-material";
 
 import MasterDetailsModal, { Section, DetailItem, TwoCol } from "../Components/MasterDetailsModal";
 import MasterFormDialog from "../Components/MasterFormDialog";
+import { useToast } from "../Components/ToastProvider";
 import MasterDeleteDialog from "../Components/MasterDeleteDialog";
 import MobileCard from "../Components/MobileCard";
+
+const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/managers`;
 
 export default function ManagerMaster() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const { showToast } = useToast();
 
   /* ── State ───────────────────────────────────────────────────────────── */
-  const [managers, setManagers] = useState(() => {
-    try {
-      const stored = localStorage.getItem("managers");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [managers, setManagers] = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [saving, setSaving]     = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [formOpen, setFormOpen] = useState(false);
-  const [editData, setEditData] = useState(null);
+  const [search, setSearch]       = useState("");
+  const [formOpen, setFormOpen]   = useState(false);
+  const [editData, setEditData]   = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailData, setDetailData] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", department: "" });
-  const [toast, setToast] = useState({ open: false, message: "", severity: "success" });
+  const [deleteId, setDeleteId]   = useState(null);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", status: true });
 
-  /* ── Persist ─────────────────────────────────────────────────────────── */
+  /* ── Auth headers ────────────────────────────────────────────────────── */
+  const authHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+  });
+
+  /* ── Fetch managers ──────────────────────────────────────────────────── */
+  const fetchManagers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(API_URL, { headers: authHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch managers");
+      const data = await res.json();
+      setManagers(Array.isArray(data) ? data : data.data ?? []);
+    } catch (err) {
+      showToast(err.message || "Error fetching managers", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
   useEffect(() => {
-    localStorage.setItem("managers", JSON.stringify(managers));
-  }, [managers]);
+    fetchManagers();
+  }, [fetchManagers]);
 
   /* ── Filtered list ───────────────────────────────────────────────────── */
   const filtered = managers.filter((m) =>
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.email.toLowerCase().includes(search.toLowerCase()) ||
-    m.department.toLowerCase().includes(search.toLowerCase())
+    (m.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
   /* ── Handlers ────────────────────────────────────────────────────────── */
   const handleAdd = () => {
     setEditData(null);
-    setForm({ name: "", email: "", phone: "", department: "" });
+    setForm({ name: "", email: "", phone: "", departmentId: "", status: true });
     setFormOpen(true);
   };
 
   const handleEdit = (manager) => {
     setEditData(manager);
-    setForm({ name: manager.name, email: manager.email, phone: manager.phone, department: manager.department });
+    setForm({
+      name:   manager.name ?? "",
+      email:  manager.email ?? "",
+      phone:  manager.phone ?? "",
+      status: manager.status ?? true,
+    });
     setFormOpen(true);
   };
 
@@ -85,33 +107,74 @@ export default function ManagerMaster() {
     setDeleteOpen(true);
   };
 
-  const handleDelete = () => {
-    setManagers(managers.filter((m) => m._id !== deleteId));
-    setDeleteOpen(false);
-    setToast({ open: true, message: "Manager deleted successfully", severity: "success" });
+  /* ── Delete ──────────────────────────────────────────────────────────── */
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`${API_URL}/${deleteId}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to delete manager");
+      setManagers((prev) => prev.filter((m) => m._id !== deleteId));
+      showToast("Manager deleted successfully", "success");
+    } catch (err) {
+      showToast(err.message || "Error deleting manager", "error");
+    } finally {
+      setDeleteOpen(false);
+    }
   };
 
-  const handleSave = () => {
+  /* ── Save (Create / Update) ──────────────────────────────────────────── */
+  const handleSave = async () => {
     if (!form.name.trim()) {
-      setToast({ open: true, message: "Manager name is required", severity: "error" });
+      showToast("Manager name is required", "error");
       return;
     }
     const duplicate = managers.find(
-      (m) => m.name.toLowerCase() === form.name.toLowerCase() &&
+      (m) =>
+        m.name.toLowerCase() === form.name.toLowerCase() &&
         (!editData || m._id !== editData._id)
     );
     if (duplicate) {
-      setToast({ open: true, message: "Manager already exists", severity: "error" });
+      showToast("Manager already exists", "error");
       return;
     }
-    if (editData) {
-      setManagers(managers.map((m) => m._id === editData._id ? { ...m, ...form } : m));
-      setToast({ open: true, message: "Manager updated successfully", severity: "success" });
-    } else {
-      setManagers([...managers, { _id: Date.now().toString(), ...form }]);
-      setToast({ open: true, message: "Manager created successfully", severity: "success" });
+
+    setSaving(true);
+    try {
+      if (editData) {
+        /* ── PUT ── */
+        const res = await fetch(`${API_URL}/${editData._id}`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error("Failed to update manager");
+        const updated = await res.json();
+        setManagers((prev) =>
+          prev.map((m) =>
+            m._id === editData._id ? { ...m, ...(updated.data ?? updated) } : m
+          )
+        );
+        showToast("Manager updated successfully", "success");
+      } else {
+        /* ── POST ── */
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error("Failed to create manager");
+        const created = await res.json();
+        setManagers((prev) => [...prev, created.data ?? created]);
+        showToast("Manager created successfully", "success");
+      }
+      setFormOpen(false);
+    } catch (err) {
+      showToast(err.message || "Error saving manager", "error");
+    } finally {
+      setSaving(false);
     }
-    setFormOpen(false);
   };
 
   /* ═══════════════════════════════════════════════════════════════════════ */
@@ -176,8 +239,15 @@ export default function ManagerMaster() {
         }}
       />
 
+      {/* ── Loading State ────────────────────────────────────────────────── */}
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+          <CircularProgress size={32} sx={{ color: "#1a3c6e" }} />
+        </Box>
+      )}
+
       {/* ── Desktop Table ────────────────────────────────────────────────── */}
-      {!isMobile && (
+      {!isMobile && !loading && (
         <Paper
           elevation={0}
           sx={{ border: "1px solid #e0e9f5", borderRadius: 1, overflow: "hidden" }}
@@ -186,7 +256,7 @@ export default function ManagerMaster() {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  {["#", "Name", "Email", "Phone", "Department", "Actions"].map((h) => (
+                  {["#", "Name", "Email", "Phone", "Status", "Actions"].map((h) => (
                     <TableCell
                       key={h}
                       sx={{
@@ -224,7 +294,18 @@ export default function ManagerMaster() {
                       <TableCell sx={{ fontWeight: 600 }}>{row.name}</TableCell>
                       <TableCell sx={{ color: "text.secondary" }}>{row.email || "—"}</TableCell>
                       <TableCell sx={{ color: "text.secondary" }}>{row.phone || "—"}</TableCell>
-                      <TableCell sx={{ color: "text.secondary" }}>{row.department || "—"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={row.status ? "Active" : "Inactive"}
+                          size="small"
+                          sx={{
+                            bgcolor: row.status ? "#e8f5e9" : "#ffebee",
+                            color: row.status ? "#2e7d32" : "#c62828",
+                            fontWeight: 600,
+                            fontSize: "0.75rem",
+                          }}
+                        />
+                      </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         <Tooltip title="View">
                           <IconButton size="small" onClick={() => handleView(row)} sx={{ color: "#4caf50", "&:hover": { bgcolor: "#e8f5e9" } }}>
@@ -252,7 +333,7 @@ export default function ManagerMaster() {
       )}
 
       {/* ── Mobile Cards ─────────────────────────────────────────────────── */}
-      {isMobile && (
+      {isMobile && !loading && (
         <Box>
           {filtered.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 6, color: "text.secondary" }}>
@@ -264,10 +345,10 @@ export default function ManagerMaster() {
                 key={row._id}
                 index={idx + 1}
                 title={row.name}
-                subtitle={row.department}
                 fields={[
                   { label: "Email", value: row.email },
                   { label: "Phone", value: row.phone },
+                  { label: "Status", value: row.status ? "Active" : "Inactive" },
                 ]}
                 onView={() => handleView(row)}
                 onEdit={() => handleEdit(row)}
@@ -285,6 +366,7 @@ export default function ManagerMaster() {
         title={editData ? "Edit Manager" : "Add Manager"}
         onSave={handleSave}
         saveLabel={editData ? "Update" : "Save"}
+        saving={saving}
       >
         <TextField
           label="Name *"
@@ -308,13 +390,22 @@ export default function ManagerMaster() {
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
         />
-        <TextField
-          label="Department"
-          fullWidth
-          size="small"
-          value={form.department}
-          onChange={(e) => setForm({ ...form, department: e.target.value })}
-        />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+          <Typography variant="body2" color="text.secondary">Status:</Typography>
+          <Chip
+            label={form.status ? "Active" : "Inactive"}
+            size="small"
+            onClick={() => setForm({ ...form, status: !form.status })}
+            sx={{
+              cursor: "pointer",
+              bgcolor: form.status ? "#e8f5e9" : "#ffebee",
+              color: form.status ? "#2e7d32" : "#c62828",
+              fontWeight: 600,
+              fontSize: "0.75rem",
+              "&:hover": { opacity: 0.85 },
+            }}
+          />
+        </Box>
       </MasterFormDialog>
 
       {/* ── Delete Dialog ─────────────────────────────────────────────────── */}
@@ -342,32 +433,20 @@ export default function ManagerMaster() {
                 <DetailItem label="Name" value={detailData.name} />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <DetailItem label="Department" value={detailData.department} />
+                <DetailItem label="Email" value={detailData.email} />
               </Box>
             </TwoCol>
             <TwoCol>
               <Box sx={{ flex: 1 }}>
-                <DetailItem label="Email" value={detailData.email} />
+                <DetailItem label="Phone" value={detailData.phone} />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <DetailItem label="Phone" value={detailData.phone} />
+                <DetailItem label="Status" value={detailData.status ? "Active" : "Inactive"} />
               </Box>
             </TwoCol>
           </>
         )}
       </MasterDetailsModal>
-
-      {/* ── Snackbar ─────────────────────────────────────────────────────── */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast({ ...toast, open: false })}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert severity={toast.severity} sx={{ width: "100%" }}>
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

@@ -25,6 +25,8 @@ import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
 import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded'
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded'
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded'
+import SourceRoundedIcon from '@mui/icons-material/SourceRounded'
+import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded'
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded'
 import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
@@ -47,8 +49,11 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: <DashboardRoundedIcon fontSize="small" /> },
   { to: '/employees', label: 'Employees', icon: <GroupRoundedIcon fontSize="small" /> },
   { to: '/projects', label: 'Projects', icon: <AssignmentRoundedIcon fontSize="small" /> },
-  { to: '/resource', label: 'Resource', icon: <MenuBookRoundedIcon fontSize="small" /> },
-  { to: '/leave', label: 'Leave', icon: <EventAvailableRoundedIcon fontSize="small" /> },
+  { to: '/resource', label: 'Resource Tracker', icon: <MenuBookRoundedIcon fontSize="small" /> },
+  { to: '/leave/apply', label: 'Apply Leave', icon: <EventAvailableRoundedIcon fontSize="small" /> },
+  { to: '/leave/my-leaves', label: 'My Leaves', icon: <EventAvailableRoundedIcon fontSize="small" /> },
+  { to: '/leave/timesheet', label: 'Timesheet Entry', icon: <SourceRoundedIcon fontSize="small" /> },
+  { to: '/leave/timesheet-history', label: 'Timesheet History', icon: <HistoryRoundedIcon fontSize="small" /> },
   { to: '/finance', label: 'Finance', icon: <AccountBalanceWalletRoundedIcon fontSize="small" /> },
   { to: '/bot-warehouse', label: 'Bot Warehouse', icon: <SmartToyRoundedIcon fontSize="small" /> },
 ]
@@ -57,7 +62,7 @@ const masterItems = [
   { to: '/master/designation', label: 'Designation Master', icon: <BadgeRoundedIcon fontSize="small" /> },
   { to: '/master/end-client', label: 'End-Client Master', icon: <ApartmentRoundedIcon fontSize="small" /> },
   { to: '/master/manager', label: 'Manager Master', icon: <GroupsRoundedIcon fontSize="small" /> },
-  { to: '/master/customer', label: 'Customer Master', icon: <BusinessRoundedIcon fontSize="small" /> },
+  // { to: '/master/customer', label: 'Customer Master', icon: <BusinessRoundedIcon fontSize="small" /> },
 ]
 
 const floatBlob = keyframes`

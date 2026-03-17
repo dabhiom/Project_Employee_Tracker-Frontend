@@ -71,7 +71,11 @@ function ComboField({ label, value, onChange, options, loading, error, helperTex
       options={options}
       getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt.label)}
       value={value || ""}
-      onInputChange={(_, newVal) => onChange(newVal)}
+      onInputChange={(_, newVal, reason) => {
+        if (reason === "input" || reason === "clear") {
+          onChange(newVal);
+        }
+      }}
       onChange={(_, selected) => {
         if (!selected) { onChange(""); return; }
         onChange(typeof selected === "string" ? selected : selected.value);
@@ -117,26 +121,31 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
           getAllEmployees(),
           getAllClients(),
         ]);
+        console.log("Fetching Dropdowns...", { empRes, clientRes });
         if (empRes.status === "fulfilled") {
+          const rawData = empRes.value.data;
           const list =
-            Array.isArray(empRes.value.data)            ? empRes.value.data :
-            Array.isArray(empRes.value.data?.data)      ? empRes.value.data.data :
-            Array.isArray(empRes.value.data?.employees) ? empRes.value.data.employees :
+            Array.isArray(rawData) ? rawData :
+            Array.isArray(rawData?.data) ? rawData.data :
+            Array.isArray(rawData?.employees) ? rawData.employees :
             [];
+          console.log("Employees DDL List:", list);
           setEmpOpts(list.map((e) => ({
-            label: e?.fullName || e?.name || `${e?.firstName||""} ${e?.lastName||""}`.trim() || e?.email || e?._id,
-            value: e._id,
+            label: e?.fullName || e?.name || (e?.firstName ? `${e.firstName} ${e?.lastName||""}`.trim() : null) || e?.email || e?._id,
+            value: e?._id,
           })));
         }
         if (clientRes.status === "fulfilled") {
+          const rawData = clientRes.value.data;
           const list =
-            Array.isArray(clientRes.value.data)          ? clientRes.value.data :
-            Array.isArray(clientRes.value.data?.data)    ? clientRes.value.data.data :
-            Array.isArray(clientRes.value.data?.clients) ? clientRes.value.data.clients :
+            Array.isArray(rawData) ? rawData :
+            Array.isArray(rawData?.data) ? rawData.data :
+            Array.isArray(rawData?.clients) ? rawData.clients :
             [];
+          console.log("Clients DDL List:", list);
           setClientOpts(list.map((c) => ({
-            label: c?.clientName || c?.name || c?.companyName || c?._id,
-            value: c._id,
+            label: c?.customerName || c?.clientName || c?.name || c?.companyName || c?._id,
+            value: c?._id,
           })));
         }
       } catch (e) {
@@ -150,8 +159,12 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
 
   useEffect(() => {
     if (editData) {
+      const getObjId = (v) => (typeof v === 'object' && v !== null ? v._id || v : v) || "";
       setForm({
         ...EMPTY, ...editData,
+        clientId: getObjId(editData.clientId),
+        projectManagerId: getObjId(editData.projectManagerId),
+        teamLeadId: getObjId(editData.teamLeadId),
         projectStartDate: toInputDate(editData.projectStartDate),
         projectEndDate:   toInputDate(editData.projectEndDate),
       });
@@ -214,7 +227,7 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
         <Row>
           <ComboField
             label="Client *"
-            value={form.clientId}
+            value={clientOpts.find(o => o.value === form.clientId) || form.clientId}
             onChange={(val) => set("clientId", val)}
             options={clientOpts}
             loading={dropping}
@@ -249,7 +262,7 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
         <Row>
           <ComboField
             label="Project Manager *"
-            value={form.projectManagerId}
+            value={empOpts.find(o => o.value === form.projectManagerId) || form.projectManagerId}
             onChange={(val) => set("projectManagerId", val)}
             options={empOpts}
             loading={dropping}
@@ -258,7 +271,7 @@ export default function ProjectFormModal({ open, onClose, onSave, editData }) {
           />
           <ComboField
             label="Team Lead *"
-            value={form.teamLeadId}
+            value={empOpts.find(o => o.value === form.teamLeadId) || form.teamLeadId}
             onChange={(val) => set("teamLeadId", val)}
             options={empOpts}
             loading={dropping}

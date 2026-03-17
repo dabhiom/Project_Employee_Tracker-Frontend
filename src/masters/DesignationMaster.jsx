@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Button,
@@ -17,6 +17,7 @@ import {
   useMediaQuery,
   useTheme,
   IconButton,
+  CircularProgress,
 } from "@mui/material";
 import { Add, Search, Visibility, Edit, Delete } from "@mui/icons-material";
 
@@ -30,20 +31,17 @@ import { useToast } from "../Components/ToastProvider";
 import MasterDeleteDialog from "../Components/MasterDeleteDialog";
 import MobileCard from "../Components/MobileCard";
 
+const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/designations`;
+
 export default function DesignationMaster() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { showToast } = useToast();
 
   /* ── State ───────────────────────────────────────────────────────────── */
-  const [designations, setDesignations] = useState(() => {
-    try {
-      const stored = localStorage.getItem("designations");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [designations, setDesignations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -52,29 +50,48 @@ export default function DesignationMaster() {
   const [detailData, setDetailData] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
-  const [form, setForm] = useState({ name: "", description: "" });
+  const [form, setForm] = useState({ designationName: "", status: true });
 
-  /* ── Persist ─────────────────────────────────────────────────────────── */
+  /* ── Auth headers ────────────────────────────────────────────────────── */
+  const authHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+  });
+
+  /* ── Fetch all designations ──────────────────────────────────────────── */
+  const fetchDesignations = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(API_URL, { headers: authHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch designations");
+      const data = await res.json();
+      setDesignations(Array.isArray(data) ? data : data.data ?? []);
+    } catch (err) {
+      showToast(err.message || "Error fetching designations", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
   useEffect(() => {
-    localStorage.setItem("designations", JSON.stringify(designations));
-  }, [designations]);
+    fetchDesignations();
+  }, [fetchDesignations]);
 
   /* ── Filtered list ───────────────────────────────────────────────────── */
   const filtered = designations.filter((d) =>
-    d.name.toLowerCase().includes(search.toLowerCase()) ||
-    (d.description || "").toLowerCase().includes(search.toLowerCase())
+    (d.designationName || "").toLowerCase().includes(search.toLowerCase())
   );
 
   /* ── Handlers ────────────────────────────────────────────────────────── */
   const handleAdd = () => {
     setEditData(null);
-    setForm({ name: "", description: "" });
+    setForm({ designationName: "", status: true });
     setFormOpen(true);
   };
 
   const handleEdit = (des) => {
     setEditData(des);
-    setForm({ name: des.name, description: des.description });
+    setForm({ designationName: des.designationName, status: des.status ?? true });
     setFormOpen(true);
   };
 
@@ -88,33 +105,71 @@ export default function DesignationMaster() {
     setDeleteOpen(true);
   };
 
-  const handleDelete = () => {
-    setDesignations(designations.filter((d) => d._id !== deleteId));
-    setDeleteOpen(false);
-    showToast("Designation deleted successfully", "success");
+  /* ── Delete ──────────────────────────────────────────────────────────── */
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE", headers: authHeaders() });
+      if (!res.ok) throw new Error("Failed to delete designation");
+      setDesignations((prev) => prev.filter((d) => d._id !== deleteId));
+      showToast("Designation deleted successfully", "success");
+    } catch (err) {
+      showToast(err.message || "Error deleting designation", "error");
+    } finally {
+      setDeleteOpen(false);
+    }
   };
 
-  const handleSave = () => {
-    if (!form.name.trim()) {
+  /* ── Save (Create / Update) ──────────────────────────────────────────── */
+  const handleSave = async () => {
+    if (!form.designationName.trim()) {
       showToast("Designation name is required", "error");
       return;
     }
     const duplicate = designations.find(
-      (d) => d.name.toLowerCase() === form.name.toLowerCase() &&
+      (d) =>
+        d.designationName.toLowerCase() === form.designationName.toLowerCase() &&
         (!editData || d._id !== editData._id)
     );
     if (duplicate) {
       showToast("Designation already exists", "error");
       return;
     }
-    if (editData) {
-      setDesignations(designations.map((d) => d._id === editData._id ? { ...d, ...form } : d));
-      showToast("Designation updated successfully", "success");
-    } else {
-      setDesignations([...designations, { _id: Date.now().toString(), ...form }]);
-      showToast("Designation created successfully", "success");
+
+    setSaving(true);
+    try {
+      if (editData) {
+        /* ── PUT ── */
+        const res = await fetch(`${API_URL}/${editData._id}`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error("Failed to update designation");
+        const updated = await res.json();
+        setDesignations((prev) =>
+          prev.map((d) =>
+            d._id === editData._id ? { ...d, ...(updated.data ?? updated) } : d
+          )
+        );
+        showToast("Designation updated successfully", "success");
+      } else {
+        /* ── POST ── */
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error("Failed to create designation");
+        const created = await res.json();
+        setDesignations((prev) => [...prev, created.data ?? created]);
+        showToast("Designation created successfully", "success");
+      }
+      setFormOpen(false);
+    } catch (err) {
+      showToast(err.message || "Error saving designation", "error");
+    } finally {
+      setSaving(false);
     }
-    setFormOpen(false);
   };
 
   /* ═══════════════════════════════════════════════════════════════════════ */
@@ -159,7 +214,7 @@ export default function DesignationMaster() {
 
       {/* ── Search Bar ──────────────────────────────────────────────────── */}
       <TextField
-        placeholder="Search by name or description..."
+        placeholder="Search by designation name..."
         size="small"
         fullWidth
         value={search}
@@ -179,8 +234,15 @@ export default function DesignationMaster() {
         }}
       />
 
+      {/* ── Loading State ────────────────────────────────────────────────── */}
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+          <CircularProgress size={32} sx={{ color: "#1a3c6e" }} />
+        </Box>
+      )}
+
       {/* ── Desktop Table ────────────────────────────────────────────────── */}
-      {!isMobile && (
+      {!isMobile && !loading && (
         <Paper
           elevation={0}
           sx={{ border: "1px solid #e0e9f5", borderRadius: 1, overflow: "hidden" }}
@@ -189,7 +251,7 @@ export default function DesignationMaster() {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  {["#", "Name", "Description", "Actions"].map((h) => (
+                  {["#", "Designation Name", "Status", "Actions"].map((h) => (
                     <TableCell
                       key={h}
                       sx={{
@@ -224,16 +286,35 @@ export default function DesignationMaster() {
                       }}
                     >
                       <TableCell sx={{ color: "text.secondary", width: 50 }}>{idx + 1}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{row.name}</TableCell>
-                      <TableCell sx={{ color: "text.secondary" }}>{row.description || "—"}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{row.designationName}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={row.status ? "Active" : "Inactive"}
+                          size="small"
+                          sx={{
+                            bgcolor: row.status ? "#e8f5e9" : "#ffebee",
+                            color: row.status ? "#2e7d32" : "#c62828",
+                            fontWeight: 600,
+                            fontSize: "0.75rem",
+                          }}
+                        />
+                      </TableCell>
                       <TableCell sx={{ whiteSpace: "nowrap" }}>
                         <Tooltip title="Edit">
-                          <IconButton size="small" onClick={() => handleEdit(row)} sx={{ color: "#2196f3", "&:hover": { bgcolor: "#e3f2fd" } }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEdit(row)}
+                            sx={{ color: "#2196f3", "&:hover": { bgcolor: "#e3f2fd" } }}
+                          >
                             <Edit fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
-                          <IconButton size="small" onClick={() => openDeleteConfirm(row._id)} sx={{ color: "#f44336", "&:hover": { bgcolor: "#ffebee" } }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => openDeleteConfirm(row._id)}
+                            sx={{ color: "#f44336", "&:hover": { bgcolor: "#ffebee" } }}
+                          >
                             <Delete fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -248,7 +329,7 @@ export default function DesignationMaster() {
       )}
 
       {/* ── Mobile Cards ─────────────────────────────────────────────────── */}
-      {isMobile && (
+      {isMobile && !loading && (
         <Box>
           {filtered.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 6, color: "text.secondary" }}>
@@ -259,9 +340,9 @@ export default function DesignationMaster() {
               <MobileCard
                 key={row._id}
                 index={idx + 1}
-                title={row.name}
+                title={row.designationName}
                 fields={[
-                  { label: "Description", value: row.description },
+                  { label: "Status", value: row.status ? "Active" : "Inactive" },
                 ]}
                 onEdit={() => handleEdit(row)}
                 onDelete={() => openDeleteConfirm(row._id)}
@@ -278,25 +359,31 @@ export default function DesignationMaster() {
         title={editData ? "Edit Designation" : "Add Designation"}
         onSave={handleSave}
         saveLabel={editData ? "Update" : "Save"}
+        saving={saving}
       >
         <TextField
-          label="Name *"
+          label="Designation Name *"
           fullWidth
           size="small"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          value={form.designationName}
+          onChange={(e) => setForm({ ...form, designationName: e.target.value })}
         />
-        <FullWidthField>
-          <TextField
-            label="Description"
-            fullWidth
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+          <Typography variant="body2" color="text.secondary">Status:</Typography>
+          <Chip
+            label={form.status ? "Active" : "Inactive"}
             size="small"
-            multiline
-            rows={3}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            onClick={() => setForm({ ...form, status: !form.status })}
+            sx={{
+              cursor: "pointer",
+              bgcolor: form.status ? "#e8f5e9" : "#ffebee",
+              color: form.status ? "#2e7d32" : "#c62828",
+              fontWeight: 600,
+              fontSize: "0.75rem",
+              "&:hover": { opacity: 0.85 },
+            }}
           />
-        </FullWidthField>
+        </Box>
       </MasterFormDialog>
 
       {/* ── Delete Dialog ─────────────────────────────────────────────────── */}
@@ -312,7 +399,10 @@ export default function DesignationMaster() {
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         title="Designation Details"
-        onEdit={() => { setDetailOpen(false); if (detailData) handleEdit(detailData); }}
+        onEdit={() => {
+          setDetailOpen(false);
+          if (detailData) handleEdit(detailData);
+        }}
         editLabel="Edit Designation"
         maxWidth="sm"
       >
@@ -321,10 +411,10 @@ export default function DesignationMaster() {
             <Section title="Information" />
             <TwoCol>
               <Box sx={{ flex: 1 }}>
-                <DetailItem label="Name" value={detailData.name} />
+                <DetailItem label="Designation Name" value={detailData.designationName} />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <DetailItem label="Description" value={detailData.description} />
+                <DetailItem label="Status" value={detailData.status ? "Active" : "Inactive"} />
               </Box>
             </TwoCol>
           </>

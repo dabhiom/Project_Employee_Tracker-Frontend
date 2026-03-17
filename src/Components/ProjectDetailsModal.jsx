@@ -23,6 +23,9 @@ const fmtDate = (val) => {
   }
 };
 
+const getClientName = (c) => typeof c === 'object' && c !== null ? (c.customerName || c.clientName || c.name || c.companyName || c._id) : (c || "");
+const getEmpName = (e) => typeof e === 'object' && e !== null ? (e.fullName || e.name || `${e.firstName||""} ${e.lastName||""}`.trim() || e.email || e._id) : (e || "");
+
 const Section = ({ title }) => (
   <Box sx={{ mb: 2 }}>
     <Typography variant="caption" fontWeight={700} color="#1a3c6e" letterSpacing={1.2} textTransform="uppercase">
@@ -83,7 +86,7 @@ export default function ProjectDetailsModal({ open, onClose, data, onEdit }) {
 
         <Section title="Project Details" />
         <TwoCol>
-          <Box sx={{ flex: 1 }}><DetailItem icon={Business}     label="Client"       value={data.clientId} /></Box>
+          <Box sx={{ flex: 1 }}><DetailItem icon={Business}     label="Client"       value={getClientName(data.clientId)} /></Box>
           <Box sx={{ flex: 1 }}><DetailItem icon={Category}     label="Project Type" value={data.projectType} /></Box>
         </TwoCol>
         <TwoCol>
@@ -99,8 +102,8 @@ export default function ProjectDetailsModal({ open, onClose, data, onEdit }) {
 
         <Section title="Team" />
         <TwoCol>
-          <Box sx={{ flex: 1 }}><DetailItem icon={Person} label="Project Manager" value={data.projectManagerId} /></Box>
-          <Box sx={{ flex: 1 }}><DetailItem icon={Person} label="Team Lead"       value={data.teamLeadId} /></Box>
+          <Box sx={{ flex: 1 }}><DetailItem icon={Person} label="Project Manager" value={getEmpName(data.projectManagerId)} /></Box>
+          <Box sx={{ flex: 1 }}><DetailItem icon={Person} label="Team Lead"       value={getEmpName(data.teamLeadId)} /></Box>
         </TwoCol>
 
         <Divider sx={{ my: 3, borderColor: "#dce6f5" }} />

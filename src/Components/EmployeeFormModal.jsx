@@ -1,25 +1,19 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  Autocomplete,
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  IconButton,
-  InputAdornment,
-  MenuItem,
-  CircularProgress,
-  Switch,
-  TextField,
-  Tooltip,
-  Typography,
+  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Divider, IconButton, InputAdornment, MenuItem, CircularProgress,
+  Switch, TextField, Typography,
 } from "@mui/material";
-import { Close, Save, Edit, InfoOutlined, CheckCircleOutline, LocationOn } from "@mui/icons-material";
+import { Close, Save, Edit, InfoOutlined, LocationOn } from "@mui/icons-material";
 
-/* ── Default empty form ─────────────────────────────────────────────────── */
+/* ── API helpers ─────────────────────────────────────────────────────────── */
+const BASE = import.meta.env.VITE_API_BASE_URL;
+const authHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+});
+
+/* ── Default empty form ──────────────────────────────────────────────────── */
 const EMPTY = {
   firstName: "",
   lastName: "",
@@ -51,42 +45,31 @@ const EMPTY = {
 const GENDER_OPTIONS    = ["Male", "Female", "Other"];
 const STATUS_OPTIONS    = ["Active", "Notice", "Exited"];
 const WORK_MODE_OPTIONS = ["WFH", "WFO", "Hybrid"];
-const DESIGNATION_OPTIONS = ["Developer", "Manager", "Analyst", "Designer", "Team Lead", "Senior Developer"];
-const MANAGER_OPTIONS   = ["Rahul Sharma", "Ankit Joshi", "Deepak Nair", "Priya Mehta", "Sneha Patel"];
 
-/* ── Live Location Autocomplete using OpenStreetMap Nominatim ──────────────
-   No API key needed — same data used by Wikipedia, many real apps.
-   Debounces 400ms, shows city/district suggestions worldwide.
-─────────────────────────────────────────────────────────────────────────── */
+/* ── Live Location Autocomplete ──────────────────────────────────────────── */
 function LocationAutocomplete({ label, value, onChange, sx }) {
-  const [inputValue, setInputValue]   = useState(value || "");
-  const [options, setOptions]         = useState([]);
-  const [loading, setLoading]         = useState(false);
-  const [open, setOpen]               = useState(false);
-  const debounceRef                   = useRef(null);
+  const [inputValue, setInputValue] = useState(value || "");
+  const [options, setOptions]       = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [open, setOpen]             = useState(false);
+  const debounceRef                 = useRef(null);
 
-  // Sync external value changes (e.g. edit mode pre-fill)
   useEffect(() => { setInputValue(value || ""); }, [value]);
 
   const fetchSuggestions = useCallback(async (query) => {
     if (!query || query.length < 2) { setOptions([]); return; }
     setLoading(true);
     try {
-      // countrycodes=in — restricts to India only
-      // addressdetails=1 — gives state/district info
-      // Remove featureType so smaller cities/towns/talukas are included
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=10&countrycodes=in`;
       const res = await fetch(url, {
-        headers: { "Accept-Language": "en", "User-Agent": "EmployeeTracker/1.0" }
+        headers: { "Accept-Language": "en", "User-Agent": "EmployeeTracker/1.0" },
       });
       const data = await res.json();
       const seen = new Set();
       const places = data
         .map((item) => {
           const a = item.address || {};
-          // Pick the most specific place name available
-          const city  = a.city || a.town || a.municipality || a.village ||
-                        a.suburb || a.county || a.district || item.name;
+          const city  = a.city || a.town || a.municipality || a.village || a.suburb || a.county || a.district || item.name;
           const state = a.state || "";
           const label = state ? `${city}, ${state}` : city;
           return { label, city };
@@ -107,11 +90,10 @@ function LocationAutocomplete({ label, value, onChange, sx }) {
   const handleInput = (e) => {
     const val = e.target.value;
     setInputValue(val);
-    onChange(val); // keep form state in sync as user types
+    onChange(val);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchSuggestions(val), 400);
-    if (val.length >= 2) setOpen(true);
-    else setOpen(false);
+    setOpen(val.length >= 2);
   };
 
   const handleSelect = (place) => {
@@ -156,12 +138,10 @@ function LocationAutocomplete({ label, value, onChange, sx }) {
             <Box key={i} onMouseDown={() => handleSelect(place)}
               sx={{
                 px: 2, py: 1.2, cursor: "pointer", fontSize: "0.855rem",
-                display: "flex", alignItems: "center", gap: 1.2,
-                color: "#1a2740",
+                display: "flex", alignItems: "center", gap: 1.2, color: "#1a2740",
                 "&:hover": { bgcolor: "#f0f5fb" },
                 borderBottom: i < options.length - 1 ? "1px solid #f0f4f8" : "none",
-              }}
-            >
+              }}>
               <LocationOn sx={{ fontSize: 14, color: "#8faabf", flexShrink: 0 }} />
               {place.label}
             </Box>
@@ -172,16 +152,10 @@ function LocationAutocomplete({ label, value, onChange, sx }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Field style
-   • White bg with visible border (#c5d4e8) so fields pop off the #eef2f8 bg
-   • Soft shadow adds depth without being heavy
-───────────────────────────────────────────────────────────────────────── */
+/* ── Field styles ────────────────────────────────────────────────────────── */
 const fsx = {
   "& .MuiOutlinedInput-root": {
-    borderRadius: "8px",
-    fontSize: "0.875rem",
-    bgcolor: "#ffffff",
+    borderRadius: "8px", fontSize: "0.875rem", bgcolor: "#ffffff",
     boxShadow: "0 1px 4px rgba(26,60,110,0.08)",
     "& fieldset": { borderColor: "#c5d4e8" },
     "&:hover fieldset": { borderColor: "#1a3c6e" },
@@ -194,12 +168,9 @@ const fsx = {
   "& .MuiFormHelperText-root": { mx: 0, mt: "4px", fontSize: "0.72rem" },
 };
 
-/* Autocomplete needs slightly different approach for bgcolor */
 const acSx = {
   "& .MuiOutlinedInput-root": {
-    borderRadius: "8px",
-    fontSize: "0.875rem",
-    bgcolor: "#ffffff",
+    borderRadius: "8px", fontSize: "0.875rem", bgcolor: "#ffffff",
     boxShadow: "0 1px 4px rgba(26,60,110,0.08)",
     "& fieldset": { borderColor: "#c5d4e8" },
     "&:hover fieldset": { borderColor: "#1a3c6e" },
@@ -210,10 +181,8 @@ const acSx = {
 };
 
 /* ── Layout helpers ──────────────────────────────────────────────────────── */
-const Row = ({ children, gap = 2, mb = 2 }) => (
-  <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap, mb }}>
-    {children}
-  </Box>
+const Row   = ({ children, gap = 2, mb = 2 }) => (
+  <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap, mb }}>{children}</Box>
 );
 const Field = ({ children }) => <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>;
 
@@ -230,7 +199,7 @@ const SectionLabel = ({ children }) => (
   </Box>
 );
 
-/* ── Hint helper text — shown in grey when no error ─────────────────────── */
+/* ── Hint helper ─────────────────────────────────────────────────────────── */
 const Hint = ({ text, error }) =>
   error ? null : (
     <Box sx={{ display: "flex", alignItems: "center", gap: 0.4, mt: "4px" }}>
@@ -239,7 +208,7 @@ const Hint = ({ text, error }) =>
     </Box>
   );
 
-/* ── Blocked char snackbar ──────────────────────────────────────────────── */
+/* ── Blocked char snackbar ───────────────────────────────────────────────── */
 const BlockedHint = ({ field }) =>
   field ? (
     <Box sx={{
@@ -249,7 +218,10 @@ const BlockedHint = ({ field }) =>
       boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
       display: "flex", alignItems: "center", gap: 1,
       animation: "fadeInUp 0.2s ease",
-      "@keyframes fadeInUp": { from: { opacity: 0, transform: "translateX(-50%) translateY(8px)" }, to: { opacity: 1, transform: "translateX(-50%) translateY(0)" } },
+      "@keyframes fadeInUp": {
+        from: { opacity: 0, transform: "translateX(-50%) translateY(8px)" },
+        to:   { opacity: 1, transform: "translateX(-50%) translateY(0)" },
+      },
     }}>
       <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#f97316" }} />
       Only {field} allowed in this field
@@ -259,11 +231,8 @@ const BlockedHint = ({ field }) =>
 /* ── Toggle Card ─────────────────────────────────────────────────────────── */
 const ToggleCard = ({ label, description, checked, onChange }) => (
   <Box sx={{
-    border: "1px solid #c5d4e8",
-    borderRadius: "8px",
-    px: 2, py: 1.5,
-    bgcolor: "#ffffff",
-    boxShadow: "0 1px 4px rgba(26,60,110,0.08)",
+    border: "1px solid #c5d4e8", borderRadius: "8px", px: 2, py: 1.5,
+    bgcolor: "#ffffff", boxShadow: "0 1px 4px rgba(26,60,110,0.08)",
     display: "flex", alignItems: "center", justifyContent: "space-between",
     transition: "border-color 0.2s, box-shadow 0.2s",
     "&:hover": { borderColor: "#1a3c6e", boxShadow: "0 2px 8px rgba(26,60,110,0.12)" },
@@ -291,17 +260,56 @@ const isValidIFSC    = (v) => !v || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v.toUpperCase(
    COMPONENT
 ════════════════════════════════════════════════════════════════════════════ */
 export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
-  const [form, setForm]     = useState(EMPTY);
-  const [errors, setErrors] = useState({});
-  const [blocked, setBlocked] = useState(""); // label of blocked char type
+  const [form,    setForm]    = useState(EMPTY);
+  const [errors,  setErrors]  = useState({});
+  const [blocked, setBlocked] = useState("");
 
+  /* ── DDL state ───────────────────────────────────────────────────────── */
+  const [designations, setDesignations] = useState([]);  // [{ _id, designationName }]
+  const [managers,     setManagers]     = useState([]);  // [{ _id, fullName }]
+  const [ddlLoading,   setDdlLoading]   = useState(false);
+
+  /* ── Fetch DDLs on mount ─────────────────────────────────────────────── */
   useEffect(() => {
-    setForm(editData ? { ...EMPTY, ...editData } : EMPTY);
+    const fetchDDLs = async () => {
+      setDdlLoading(true);
+      try {
+        const [desRes, mgrRes] = await Promise.all([
+          fetch(`${BASE}/api/ddls/designations`, { headers: authHeaders() }),
+          fetch(`${BASE}/api/ddls/employees`,    { headers: authHeaders() }),
+        ]);
+        const desJson = await desRes.json();
+        const mgrJson = await mgrRes.json();
+        setDesignations(Array.isArray(desJson.data) ? desJson.data : []);
+        setManagers(Array.isArray(mgrJson.data)     ? mgrJson.data : []);
+      } catch {
+        setDesignations([]);
+        setManagers([]);
+      } finally {
+        setDdlLoading(false);
+      }
+    };
+    fetchDDLs();
+  }, []);
+
+  /* ── Sync form with editData ─────────────────────────────────────────── */
+  useEffect(() => {
+    if (editData) {
+      setForm({
+        ...EMPTY,
+        ...editData,
+        // For edit mode, store the _id so the dropdown pre-selects correctly
+        designation:      editData.designationId?._id      || editData.designationId      || editData.designation      || "",
+        reportingManager: editData.reportingManagerId?._id || editData.reportingManagerId || editData.reportingManager || "",
+      });
+    } else {
+      setForm(EMPTY);
+    }
     setErrors({});
     setBlocked("");
   }, [editData, open]);
 
-  /* Show "blocked" hint briefly then clear */
+  /* ── Blocked char flash ──────────────────────────────────────────────── */
   const flashBlocked = (label) => {
     setBlocked(label);
     setTimeout(() => setBlocked(""), 1800);
@@ -318,43 +326,32 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
     if (name === "phone") {
       const clean = value.replace(/[^\d+\-\s()]/g, "");
       if (clean !== value) flashBlocked("digits, +, - and spaces");
-      set(name, clean);
-      return;
+      set(name, clean); return;
     }
-
     if (name === "overallExperience" || name === "relevantExperience") {
       const clean = value.replace(/[^\d.]/g, "");
       if (clean !== value) flashBlocked("numbers");
-      set(name, clean);
-      return;
+      set(name, clean); return;
     }
-
     if (name === "aadhaarNumber") {
       const clean = value.replace(/\D/g, "").slice(0, 12);
       if (clean !== value.slice(0, 12)) flashBlocked("digits");
-      set(name, clean);
-      return;
+      set(name, clean); return;
     }
-
     if (name === "bankAccount") {
       const clean = value.replace(/\D/g, "");
       if (clean !== value) flashBlocked("digits");
-      set(name, clean);
-      return;
+      set(name, clean); return;
     }
-
     if (name === "panNumber") {
       const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
       if (clean !== value.toUpperCase().slice(0, 10)) flashBlocked("letters and digits");
-      set(name, clean);
-      return;
+      set(name, clean); return;
     }
-
     if (name === "ifscCode") {
       const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11);
       if (clean !== value.toUpperCase().slice(0, 11)) flashBlocked("letters and digits");
-      set(name, clean);
-      return;
+      set(name, clean); return;
     }
 
     set(name, type === "checkbox" ? checked : value);
@@ -362,18 +359,17 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
 
   const validate = () => {
     const e = {};
-    if (!form.firstName.trim())  e.firstName    = "First name is required";
-    if (!form.lastName.trim())   e.lastName     = "Last name is required";
-    if (!form.employeeId.trim()) e.employeeId   = "Employee ID is required";
-    if (!form.email.trim())      e.email        = "Email is required";
-    else if (!isValidEmail(form.email)) e.email = "Enter a valid email address";
-    if (form.phone && !isValidPhone(form.phone)) e.phone = "Enter a valid phone number";
-    if (!form.designation)       e.designation  = "Designation is required";
-    if (!form.dateOfJoining)     e.dateOfJoining = "Date of joining is required";
-    if (!form.employeeStatus)    e.employeeStatus = "Status is required";
-    if (form.panNumber && !isValidPAN(form.panNumber))             e.panNumber     = "Invalid PAN (e.g. ABCDE1234F)";
+    if (!form.firstName.trim())   e.firstName      = "First name is required";
+    if (!form.lastName.trim())    e.lastName       = "Last name is required";
+    if (!form.email.trim())       e.email          = "Email is required";
+    else if (!isValidEmail(form.email)) e.email    = "Enter a valid email address";
+    if (form.phone && !isValidPhone(form.phone))              e.phone          = "Enter a valid phone number";
+    if (!form.designation)                                    e.designation    = "Designation is required";
+    if (!form.dateOfJoining)                                  e.dateOfJoining  = "Date of joining is required";
+    if (!form.employeeStatus)                                 e.employeeStatus = "Status is required";
+    if (form.panNumber     && !isValidPAN(form.panNumber))    e.panNumber      = "Invalid PAN (e.g. ABCDE1234F)";
     if (form.aadhaarNumber && !isValidAadhaar(form.aadhaarNumber)) e.aadhaarNumber = "Aadhaar must be 12 digits";
-    if (form.ifscCode && !isValidIFSC(form.ifscCode))              e.ifscCode      = "Invalid IFSC (e.g. SBIN0001234)";
+    if (form.ifscCode      && !isValidIFSC(form.ifscCode))    e.ifscCode       = "Invalid IFSC (e.g. SBIN0001234)";
     return e;
   };
 
@@ -381,8 +377,7 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
     const errs = validate();
     if (Object.keys(errs).length) {
       setErrors(errs);
-      const firstKey = Object.keys(errs)[0];
-      const el = document.querySelector(`[name="${firstKey}"]`);
+      const el = document.querySelector(`[name="${Object.keys(errs)[0]}"]`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -390,31 +385,27 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
     onClose();
   };
 
-  /* ── Progress: how many required fields are filled ─────────────── */
-  const required = ["firstName", "lastName", "employeeId", "email", "designation", "dateOfJoining", "employeeStatus"];
+  /* ── Progress ────────────────────────────────────────────────────────── */
+  const required = ["firstName", "lastName", "email", "designation", "dateOfJoining", "employeeStatus"];
   const filled   = required.filter((k) => form[k]?.toString().trim()).length;
   const progress = Math.round((filled / required.length) * 100);
 
+  /* ── Helpers to get display name from selected _id ───────────────────── */
+  const selectedDesignationName = designations.find((d) => d._id === form.designation)?.designationName || "";
+  const selectedManagerName     = managers.find((m) => m._id === form.reportingManager)?.fullName || "";
+
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullWidth
-      maxWidth="lg"
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg"
       PaperProps={{
         sx: {
-          borderRadius: "12px",
-          m: 2,
-          height: "calc(100vh - 48px)",
-          maxHeight: "calc(100vh - 48px)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
+          borderRadius: "12px", m: 2,
+          height: "calc(100vh - 48px)", maxHeight: "calc(100vh - 48px)",
+          display: "flex", flexDirection: "column", overflow: "hidden",
           boxShadow: "0 32px 80px rgba(26,60,110,0.22)",
         },
-      }}
-    >
-      {/* ══ HEADER ════════════════════════════════════════════════════════ */}
+      }}>
+
+      {/* ── HEADER ────────────────────────────────────────────────────── */}
       <DialogTitle sx={{
         background: "linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)",
         color: "#fff", px: 3, py: 2, flexShrink: 0,
@@ -432,7 +423,6 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
           </Box>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {/* Progress pill */}
           <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: 1 }}>
             <Box sx={{ width: 80, height: 4, bgcolor: "rgba(255,255,255,0.2)", borderRadius: 4, overflow: "hidden" }}>
               <Box sx={{ width: `${progress}%`, height: "100%", bgcolor: progress === 100 ? "#4ade80" : "#5baeff", borderRadius: 4, transition: "width 0.3s ease" }} />
@@ -446,12 +436,11 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
         </Box>
       </DialogTitle>
 
-      {/* ══ CONTENT ═══════════════════════════════════════════════════════ */}
+      {/* ── CONTENT ───────────────────────────────────────────────────── */}
       <DialogContent sx={{ flexGrow: 1, overflowY: "auto", bgcolor: "#eef2f8", p: 3 }}>
 
-        {/* ─ Basic Information ───────────────────────────────────────── */}
+        {/* Basic Information */}
         <SectionLabel>Basic Information</SectionLabel>
-
         <Row>
           <Field>
             <TextField fullWidth size="small" name="firstName" label="First Name *"
@@ -462,11 +451,6 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
             <TextField fullWidth size="small" name="lastName" label="Last Name *"
               value={form.lastName} onChange={handleChange}
               error={!!errors.lastName} helperText={errors.lastName} sx={fsx} />
-          </Field>
-          <Field>
-            <TextField fullWidth size="small" name="employeeId" label="Employee ID *"
-              value={form.employeeId} onChange={handleChange}
-              error={!!errors.employeeId} helperText={errors.employeeId} sx={fsx} />
           </Field>
         </Row>
 
@@ -498,19 +482,13 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               inputProps={{ maxLength: 15 }} sx={fsx} />
           </Field>
           <Field>
-            <LocationAutocomplete
-              label="Home Town"
-              value={form.homeTown}
-              onChange={(v) => set("homeTown", v)}
-              sx={acSx}
-            />
+            <LocationAutocomplete label="Home Town" value={form.homeTown}
+              onChange={(v) => set("homeTown", v)} sx={acSx} />
           </Field>
-          <Field />
         </Row>
 
-        {/* ─ Employment Details ──────────────────────────────────────── */}
+        {/* Employment Details */}
         <SectionLabel>Employment Details</SectionLabel>
-
         <Row>
           <Field>
             <TextField fullWidth size="small" type="date" name="dateOfJoining" label="Date of Joining *"
@@ -525,12 +503,6 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               {STATUS_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
             </TextField>
           </Field>
-          <Field>
-            <TextField fullWidth size="small" name="overallExperience" label="Overall Experience (Yrs)"
-              value={form.overallExperience} onChange={handleChange}
-              inputProps={{ inputMode: "decimal" }}
-              helperText={<Hint text="Numbers only" />} sx={fsx} />
-          </Field>
         </Row>
 
         <Row>
@@ -540,49 +512,61 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
               inputProps={{ inputMode: "decimal" }}
               helperText={<Hint text="Numbers only" />} sx={fsx} />
           </Field>
-          <Field /><Field />
+          <Field>
+            <TextField fullWidth size="small" name="overallExperience" label="Overall Experience (Yrs)"
+              value={form.overallExperience} onChange={handleChange}
+              inputProps={{ inputMode: "decimal" }}
+              helperText={<Hint text="Numbers only" />} sx={fsx} />
+          </Field>
         </Row>
 
-        {/* ─ Organization Details ────────────────────────────────────── */}
+        {/* Organization Details */}
         <SectionLabel>Organization Details</SectionLabel>
-
         <Row>
+          {/* Designation — live from API */}
           <Field>
             <TextField fullWidth size="small" select name="designation" label="Designation *"
               value={form.designation} onChange={handleChange}
-              error={!!errors.designation} helperText={errors.designation} sx={fsx}>
-              {DESIGNATION_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+              error={!!errors.designation} helperText={errors.designation}
+              disabled={ddlLoading}
+              InputProps={ddlLoading ? {
+                endAdornment: <InputAdornment position="end"><CircularProgress size={14} sx={{ color: "#1a3c6e" }} /></InputAdornment>,
+              } : undefined}
+              sx={fsx}>
+              {designations.length === 0 && !ddlLoading && (
+                <MenuItem disabled value=""><em>No designations found</em></MenuItem>
+              )}
+              {designations.map((d) => (
+                <MenuItem key={d._id} value={d._id}>{d.designationName}</MenuItem>
+              ))}
             </TextField>
           </Field>
-          <Field>
-            <TextField fullWidth size="small" name="department" label="Department"
-              placeholder="e.g. IT, HR, Finance"
-              value={form.department} onChange={handleChange} sx={fsx} />
-          </Field>
+
+          {/* Reporting Manager — live from API */}
           <Field>
             <TextField fullWidth size="small" select name="reportingManager" label="Reporting Manager"
-              value={form.reportingManager} onChange={handleChange} sx={fsx}>
-              {MANAGER_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+              value={form.reportingManager} onChange={handleChange}
+              disabled={ddlLoading}
+              InputProps={ddlLoading ? {
+                endAdornment: <InputAdornment position="end"><CircularProgress size={14} sx={{ color: "#1a3c6e" }} /></InputAdornment>,
+              } : undefined}
+              sx={fsx}>
+              <MenuItem value=""><em>None</em></MenuItem>
+              {managers.map((m) => (
+                <MenuItem key={m._id} value={m._id}>{m.fullName}</MenuItem>
+              ))}
             </TextField>
           </Field>
         </Row>
 
         <Row>
           <Field>
-            <LocationAutocomplete
-              label="Base Location"
-              value={form.baseLocation}
-              onChange={(v) => set("baseLocation", v)}
-              sx={acSx}
-            />
+            <LocationAutocomplete label="Base Location" value={form.baseLocation}
+              onChange={(v) => set("baseLocation", v)} sx={acSx} />
           </Field>
           <Field>
-            <LocationAutocomplete
-              label="Current Location"
-              value={form.currentLocation}
-              onChange={(v) => set("currentLocation", v)}
-              sx={acSx}
-            />
+            <LocationAutocomplete label="Current Location" value={form.currentLocation}
+              onChange={(v) => set("currentLocation", v)} sx={acSx} />
           </Field>
           <Field>
             <TextField fullWidth size="small" select name="workMode" label="Work Mode"
@@ -592,9 +576,8 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
           </Field>
         </Row>
 
-        {/* ─ Additional Details ──────────────────────────────────────── */}
+        {/* Additional Details */}
         <SectionLabel>Additional Details</SectionLabel>
-
         <Row mb={2}>
           <Field>
             <ToggleCard
@@ -661,12 +644,10 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
         </Row>
       </DialogContent>
 
-      {/* ══ FOOTER ════════════════════════════════════════════════════════ */}
+      {/* ── FOOTER ────────────────────────────────────────────────────── */}
       <DialogActions sx={{
-        px: 3, py: 2, bgcolor: "#fff",
-        borderTop: "1px solid #e0eaf5",
-        flexShrink: 0, gap: 1,
-        display: "flex", alignItems: "center",
+        px: 3, py: 2, bgcolor: "#fff", borderTop: "1px solid #e0eaf5",
+        flexShrink: 0, gap: 1, display: "flex", alignItems: "center",
       }}>
         <Typography variant="caption" color="#8faabf" sx={{ mr: "auto", fontSize: "0.72rem" }}>
           * Required fields
@@ -692,7 +673,6 @@ export default function EmployeeFormModal({ open, onClose, onSave, editData }) {
         </Button>
       </DialogActions>
 
-      {/* ── Blocked-char floating hint ─────────────────────────────────── */}
       <BlockedHint field={blocked} />
     </Dialog>
   );
