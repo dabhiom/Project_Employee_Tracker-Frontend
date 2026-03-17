@@ -5,6 +5,7 @@ import { ToastProvider } from "./Components/ToastProvider";
 import DashboardPage from "./Pages/DashboardPage";
 import EmployeesPage from "./Pages/EmployeesPage";
 import FinancePage from "./Pages/FinancePage";
+import BotWarehousePage from "./Pages/BotWarehousePage";
 import LeavePage from "./Pages/LeavePage";
 import LoginPage from "./Pages/LoginPage";
 import ProjectsPage from "./Pages/ProjectsPage";
@@ -83,6 +84,7 @@ function App() {
               <Route path="/resource" element={<ResourcePage />} />
               <Route path="/leave" element={<LeavePage />} />
               <Route path="/finance" element={<FinancePage />} />
+              <Route path="/bot-warehouse" element={<BotWarehousePage />} />
               <Route
                 path="/master/designation"
                 element={<DesignationMaster />}

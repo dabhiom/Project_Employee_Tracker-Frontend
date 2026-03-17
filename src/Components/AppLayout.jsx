@@ -26,6 +26,7 @@ import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded'
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded'
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded'
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded'
+import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import BusinessIcon from '@mui/icons-material/Business'
 import PersonIcon from '@mui/icons-material/Person'
@@ -49,6 +50,7 @@ const navItems = [
   { to: '/resource', label: 'Resource', icon: <MenuBookRoundedIcon fontSize="small" /> },
   { to: '/leave', label: 'Leave', icon: <EventAvailableRoundedIcon fontSize="small" /> },
   { to: '/finance', label: 'Finance', icon: <AccountBalanceWalletRoundedIcon fontSize="small" /> },
+  { to: '/bot-warehouse', label: 'Bot Warehouse', icon: <SmartToyRoundedIcon fontSize="small" /> },
 ]
 
 const masterItems = [
